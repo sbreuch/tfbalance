@@ -193,11 +193,11 @@ enrich_corrected <- function(idx, hits, genes, min_expected = 10) {
 # p.adjust() esclude gia' gli NA dal conteggio di m; qui si esclude anche chi ha keep = FALSE.
 bh_subset <- function(p, keep) {
   if (length(p) != length(keep))
-    stop("`p` e `keep` devono avere la stessa lunghezza", call. = FALSE)
+    stop("`p` and `keep` must have the same length", call. = FALSE)
   if (!is.logical(keep))
-    stop("`keep` deve essere un vettore logico", call. = FALSE)
+    stop("`keep` must be a logical vector", call. = FALSE)
   if (anyNA(keep))
-    stop("`keep` non deve contenere NA", call. = FALSE)
+    stop("`keep` must not contain NA", call. = FALSE)
   out <- rep(NA_real_, length(p))
   out[keep] <- p.adjust(p[keep], "BH")
   out
@@ -225,11 +225,11 @@ bh_subset <- function(p, keep) {
 random_list <- function(genes, n, biased = FALSE, by = "gc", power = 2) {
   N <- nrow(genes)
   if (!is.numeric(n) || length(n) != 1 || is.na(n) || n != round(n) || n < 1 || n > N)
-    stop("`n` deve essere un intero tra 1 e ", N, call. = FALSE)
+    stop("`n` must be an integer between 1 and ", N, call. = FALSE)
   if (!is.character(by) || length(by) != 1 || !(by %in% c("gc", "total_sites_noext")))
-    stop("`by` deve essere \"gc\" o \"total_sites_noext\"", call. = FALSE)
+    stop("`by` must be \"gc\" or \"total_sites_noext\"", call. = FALSE)
   if (!is.numeric(power) || length(power) != 1 || !is.finite(power))
-    stop("`power` deve essere un numero singolo finito", call. = FALSE)
+    stop("`power` must be a single finite number", call. = FALSE)
 
   if (!biased) return(sort(sample.int(N, n)))
 
@@ -246,8 +246,8 @@ random_list <- function(genes, n, biased = FALSE, by = "gc", power = 2) {
 # or_low e or_high = exp(beta -/+ qnorm(0.975) * se) (Wald 95%), note.
 #
 # note = "ok"                             stima valida.
-# note = "has_site costante"              il motivo ha K = 0 o K = N geni: niente da stimare.
-# note = "separazione o non convergenza"  una cella della tabella 2x2 has_site x in_list e'
+# note = "constant has_site"              il motivo ha K = 0 o K = N geni: niente da stimare.
+# note = "separation or non-convergence"  una cella della tabella 2x2 has_site x in_list e'
 #                                         zero (stima inesistente, glm NON e' chiamato), oppure
 #                                         glm non converge, o le probabilita' stimate sono
 #                                         numericamente 0 o 1, o il coefficiente non e' finito.
@@ -261,7 +261,7 @@ random_list <- function(genes, n, biased = FALSE, by = "gc", power = 2) {
 # eps = 10 * .Machine$double.eps. fit$boundary (avviso "stopped at boundary value") NON e'
 # usato. Mai dal testo degli avvisi di glm (i messaggi di R sono tradotti nella lingua del
 # sistema). Gli avvisi di glm sono silenziati (muffleWarning) e non escono dalla funzione.
-# "has_site costante" ha la precedenza sulle celle vuote.
+# "constant has_site" ha la precedenza sulle celle vuote.
 # Gli errori di glm NON sono catturati: in casi estremi glm.fit puo' dare un errore
 # ("no valid set of coefficients"), che qui uscirebbe.
 # Indici di motif_genes fuori da 1..N sono ignorati (si usa %in%).
@@ -275,7 +275,7 @@ odds_ratio_one <- function(idx, motif_genes, genes) {
                or_low = exp(beta - z975 * se), or_high = exp(beta + z975 * se),
                note = note, stringsAsFactors = FALSE)
 
-  if (sum(has) == 0 || sum(has) == N) return(out("has_site costante"))
+  if (sum(has) == 0 || sum(has) == N) return(out("constant has_site"))
 
   # Tabella 2x2 has_site x in_list: k = geni della lista con il sito, n = geni della
   # lista, K = geni con il sito. Se una delle quattro celle e' zero la stima di massima
@@ -283,7 +283,7 @@ odds_ratio_one <- function(idx, motif_genes, genes) {
   # enorme senza avvisare. Allora NA, senza chiamare glm.
   n <- length(idx); K <- sum(has); k <- sum(has[idx])
   if (k == 0 || n - k == 0 || K - k == 0 || N - K - (n - k) == 0)
-    return(out("separazione o non convergenza"))
+    return(out("separation or non-convergence"))
 
   muffle <- function(w) invokeRestart("muffleWarning")
   d <- data.frame(y = as.numeric(seq_len(N) %in% idx), has = as.numeric(has),
@@ -294,8 +294,8 @@ odds_ratio_one <- function(idx, motif_genes, genes) {
   mu <- fit$fitted.values
   beta <- unname(coef(fit)["has"])
   if (!fit$converged || any(mu < eps | mu > 1 - eps) || is.na(beta))
-    return(out("separazione o non convergenza"))
+    return(out("separation or non-convergence"))
   se <- withCallingHandlers(summary(fit)$coefficients["has", "Std. Error"], warning = muffle)
-  if (!is.finite(beta) || !is.finite(se)) return(out("separazione o non convergenza"))
+  if (!is.finite(beta) || !is.finite(se)) return(out("separation or non-convergence"))
   out("ok", beta = beta, se = unname(se))
 }

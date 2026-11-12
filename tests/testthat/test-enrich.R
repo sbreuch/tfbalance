@@ -576,13 +576,13 @@ test_that("random_list: n = 1 e n = N sono validi", {
   expect_identical(random_list(toy$genes, 500), 1:500)
 })
 
-# Messaggi attesi: "`n` deve essere un intero tra 1 e 500"
-#                  "`by` deve essere \"gc\" o \"total_sites_noext\""  (nome esatto, niente
+# Messaggi attesi: "`n` must be an integer between 1 and 500"
+#                  "`by` must be \"gc\" or \"total_sites_noext\""  (nome esatto, niente
 #                  corrispondenza parziale: "total_sites" e' una colonna ma NON e' valida)
 test_that("random_list: n fuori range o non valido e' un errore con messaggio chiaro", {
   toy <- make_toy(N = 500)
   for (bad in list(0, -3, 501, 2.5, NA_real_, c(5, 10)))
-    expect_error(random_list(toy$genes, bad), "n. deve essere un intero tra 1 e 500",
+    expect_error(random_list(toy$genes, bad), "n. must be an integer between 1 and 500",
                  info = paste(deparse(bad), collapse = ""))
 })
 
@@ -590,15 +590,15 @@ test_that("random_list: by non valido e' un errore con messaggio chiaro", {
   toy <- make_toy(N = 500)
   for (bad in list("total_sites", "GC", "foo", NA_character_, 1))
     expect_error(random_list(toy$genes, 50, biased = TRUE, by = bad),
-                 "by. deve essere.*gc.*total_sites_noext", info = paste(deparse(bad), collapse = ""))
+                 "by. must be.*gc.*total_sites_noext", info = paste(deparse(bad), collapse = ""))
 })
 
-# Messaggio atteso: "`power` deve essere un numero singolo finito"
+# Messaggio atteso: "`power` must be a single finite number"
 test_that("random_list: power non valido e' un errore con messaggio chiaro", {
   toy <- make_toy(N = 500)
   for (bad in list(NA_real_, "2", Inf, c(1, 2)))
     expect_error(random_list(toy$genes, 50, biased = TRUE, power = bad),
-                 "power. deve essere un numero singolo finito", info = paste(deparse(bad), collapse = ""))
+                 "power. must be a single finite number", info = paste(deparse(bad), collapse = ""))
 })
 
 # === odds_ratio_one =========================================================
@@ -607,8 +607,8 @@ test_that("random_list: power non valido e' un errore con messaggio chiaro", {
 # riga con beta (coefficiente di has_site), se, or = exp(beta), or_low e or_high =
 # exp(beta -/+ qnorm(0.975) * se) (Wald 95%) e note. Dichiarato prima del codice:
 #   note = "ok"                              caso normale
-#   note = "separazione o non convergenza"   glm avverte (fitted probabilities 0 o 1) o non converge
-#   note = "has_site costante"               K = 0 oppure K = N
+#   note = "separation or non-convergence"   glm avverte (fitted probabilities 0 o 1) o non converge
+#   note = "constant has_site"               K = 0 oppure K = N
 # Negli ultimi due casi i cinque campi numerici sono NA; nessun errore e nessun avviso esce
 # dalla funzione. Il riferimento e' un glm fatto a mano con la stessa formula (covariate non
 # standardizzate); tolleranza relativa 1e-6.
@@ -637,7 +637,7 @@ test_that("odds_ratio_one: motivo = esattamente la lista (separazione) -> NA e n
   res <- NULL
   expect_no_warning(res <- odds_ratio_one(1:60, 1:60, toy$genes))   # un errore farebbe fallire il test
   expect_true(all(is.na(res[, c("beta", "se", "or", "or_low", "or_high")])))
-  expect_equal(res$note, "separazione o non convergenza")
+  expect_equal(res$note, "separation or non-convergence")
 })
 
 test_that("odds_ratio_one: has_site costante (K = 0 e K = N) -> NA e nota, nessun avviso", {
@@ -646,7 +646,7 @@ test_that("odds_ratio_one: has_site costante (K = 0 e K = N) -> NA e nota, nessu
     res <- NULL
     expect_no_warning(res <- odds_ratio_one(1:60, motif, toy$genes))
     expect_true(all(is.na(res[, c("beta", "se", "or", "or_low", "or_high")])))
-    expect_equal(res$note, "has_site costante")
+    expect_equal(res$note, "constant has_site")
   }
 })
 
@@ -680,8 +680,8 @@ test_that("odds_ratio_one: lista non valida e' un errore chiaro", {
 # K = geni con il sito, N = tutti i geni, le quattro celle sono
 #     k,   n - k,   K - k,   N - K - (n - k).
 # Se UNA e' zero la stima di massima verosimiglianza non esiste (separazione completa o
-# parziale): i cinque campi numerici sono NA e note = "separazione o non convergenza",
-# SENZA chiamare glm. has_site costante (K = 0 o K = N) resta "has_site costante" e ha la
+# parziale): i cinque campi numerici sono NA e note = "separation or non-convergence",
+# SENZA chiamare glm. has_site costante (K = 0 o K = N) resta "constant has_site" e ha la
 # precedenza. Il caso 59 su 60 (nessuna cella vuota) resta "ok" con un OR finito, enorme
 # ma esistente. I controlli su converged e fitted.values restano.
 cells2x2 <- function(idx, motif, N) {
@@ -701,7 +701,7 @@ test_that("odds_ratio_one: una cella vuota della tabella 2x2 -> NA e nota, nessu
     res <- NULL
     expect_no_warning(res <- odds_ratio_one(cs$idx, cs$motif, toy$genes))
     expect_true(all(is.na(res[, c("beta", "se", "or", "or_low", "or_high")])), info = cs$zero)
-    expect_equal(res$note, "separazione o non convergenza", info = cs$zero)
+    expect_equal(res$note, "separation or non-convergence", info = cs$zero)
   }
 })
 
@@ -777,7 +777,7 @@ test_that("bh_subset: nessun motivo tenuto -> tutto NA, senza errori", {
 })
 
 test_that("bh_subset: argomenti non validi sono un errore", {
-  expect_error(bh_subset(c(.1, .2), TRUE), "stessa lunghezza")
-  expect_error(bh_subset(c(.1, .2), c(1, 0)), "logico")
-  expect_error(bh_subset(c(.1, .2), c(TRUE, NA)), "NA")
+  expect_error(bh_subset(c(.1, .2), TRUE), "same length")
+  expect_error(bh_subset(c(.1, .2), c(1, 0)), "logical vector")
+  expect_error(bh_subset(c(.1, .2), c(TRUE, NA)), "must not contain NA")
 })

@@ -47,7 +47,7 @@ analyze_list <- function(text, genes, hits, frac_range = c(0.005, 0.9), min_expe
     stop("The list has ", length(idx), " recognised genes: the maximum is ", MAX_LIST,
          call. = FALSE)
   N <- nrow(genes)
-  check_list(idx, N)                   # errori (es. "tutti i geni") passano com'e'
+  check_list(idx, N)                   # errori (es. "all genes") passano com'e'
 
   # token in piu' = token puliti - geni unici - ignoti unici (map_ids toglie da solo
   # le ripetizioni, quindi la differenza e' proprio il numero di ripetizioni)
