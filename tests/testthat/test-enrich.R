@@ -600,3 +600,137 @@ test_that("random_list: power non valido e' un errore con messaggio chiaro", {
     expect_error(random_list(toy$genes, 50, biased = TRUE, power = bad),
                  "power. deve essere un numero singolo finito", info = paste(deparse(bad), collapse = ""))
 })
+
+# === odds_ratio_one =========================================================
+# odds_ratio_one(idx, motif_genes, genes): UN solo motivo, con glm(). Stesso modello di
+# enrich_corrected: in_list ~ has_site + gc + log1p(total_sites_noext). Restituisce una
+# riga con beta (coefficiente di has_site), se, or = exp(beta), or_low e or_high =
+# exp(beta -/+ qnorm(0.975) * se) (Wald 95%) e note. Dichiarato prima del codice:
+#   note = "ok"                              caso normale
+#   note = "separazione o non convergenza"   glm avverte (fitted probabilities 0 o 1) o non converge
+#   note = "has_site costante"               K = 0 oppure K = N
+# Negli ultimi due casi i cinque campi numerici sono NA; nessun errore e nessun avviso esce
+# dalla funzione. Il riferimento e' un glm fatto a mano con la stessa formula (covariate non
+# standardizzate); tolleranza relativa 1e-6.
+
+test_that("odds_ratio_one: coincide con un glm fatto a mano (beta, se, or, intervallo Wald 95%)", {
+  toy <- make_toy(N = 300)
+  idx <- 1:60
+  motif <- c(1:40, 101:140)                      # K = 80, 40 nella lista: arricchimento moderato
+  d <- data.frame(y = as.numeric(seq_len(300) %in% idx), has = as.numeric(seq_len(300) %in% motif),
+                  gc = toy$genes$gc, ls = log1p(toy$genes$total_sites_noext))
+  fit <- glm(y ~ has + gc + ls, binomial, d)
+  b <- unname(coef(fit)["has"]); se <- unname(summary(fit)$coefficients["has", "Std. Error"])
+  res <- odds_ratio_one(idx, motif, toy$genes)
+  expect_named(res, c("beta", "se", "or", "or_low", "or_high", "note"))
+  expect_equal(nrow(res), 1)
+  expect_equal(res$beta, b, tolerance = 1e-6)
+  expect_equal(res$se, se, tolerance = 1e-6)
+  expect_equal(res$or, exp(b), tolerance = 1e-6)
+  expect_equal(res$or_low, exp(b - qnorm(0.975) * se), tolerance = 1e-6)
+  expect_equal(res$or_high, exp(b + qnorm(0.975) * se), tolerance = 1e-6)
+  expect_equal(res$note, "ok")
+})
+
+test_that("odds_ratio_one: motivo = esattamente la lista (separazione) -> NA e nota, nessun avviso", {
+  toy <- make_toy(N = 300)
+  res <- NULL
+  expect_no_warning(res <- odds_ratio_one(1:60, 1:60, toy$genes))   # un errore farebbe fallire il test
+  expect_true(all(is.na(res[, c("beta", "se", "or", "or_low", "or_high")])))
+  expect_equal(res$note, "separazione o non convergenza")
+})
+
+test_that("odds_ratio_one: has_site costante (K = 0 e K = N) -> NA e nota, nessun avviso", {
+  toy <- make_toy(N = 300)
+  for (motif in list(integer(0), seq_len(300))) {
+    res <- NULL
+    expect_no_warning(res <- odds_ratio_one(1:60, motif, toy$genes))
+    expect_true(all(is.na(res[, c("beta", "se", "or", "or_low", "or_high")])))
+    expect_equal(res$note, "has_site costante")
+  }
+})
+
+test_that("odds_ratio_one: il segno di log(or) coincide con quello di z di enrich_corrected", {
+  toy <- make_toy(N = 300)
+  # segnale piantato: z > 0, log(or) > 0
+  toy$hits[[1]]$genes <- 1:80
+  idx <- c(1:50, 101:110)
+  z <- enrich_corrected(idx, toy$hits, toy$genes, min_expected = 0)$z[1]
+  res <- odds_ratio_one(idx, toy$hits[[1]]$genes, toy$genes)
+  expect_equal(res$note, "ok")
+  expect_gt(z, 0); expect_gt(log(res$or), 0)
+  expect_equal(sign(log(res$or)), sign(z))
+  # impoverimento: solo 2 geni della lista su K = 42 (attesi 8.4): z < 0, log(or) < 0
+  toy$hits[[1]]$genes <- c(1:2, 101:140)
+  z <- enrich_corrected(1:60, toy$hits, toy$genes, min_expected = 0)$z[1]
+  res <- odds_ratio_one(1:60, toy$hits[[1]]$genes, toy$genes)
+  expect_equal(res$note, "ok")
+  expect_lt(z, 0); expect_lt(log(res$or), 0)
+  expect_equal(sign(log(res$or)), sign(z))
+})
+
+test_that("odds_ratio_one: lista non valida e' un errore chiaro", {
+  toy <- make_toy(N = 300)
+  expect_error(odds_ratio_one(integer(0), 1:10, toy$genes), "vuota")
+  expect_error(odds_ratio_one(c(1, 1, 2), 1:10, toy$genes), "ripetuti")
+})
+
+# --- odds_ratio_one: celle vuote della tabella 2x2 has_site x in_list ------------
+# Dichiarato prima del codice. Con k = geni della lista con il sito, n = geni della lista,
+# K = geni con il sito, N = tutti i geni, le quattro celle sono
+#     k,   n - k,   K - k,   N - K - (n - k).
+# Se UNA e' zero la stima di massima verosimiglianza non esiste (separazione completa o
+# parziale): i cinque campi numerici sono NA e note = "separazione o non convergenza",
+# SENZA chiamare glm. has_site costante (K = 0 o K = N) resta "has_site costante" e ha la
+# precedenza. Il caso 59 su 60 (nessuna cella vuota) resta "ok" con un OR finito, enorme
+# ma esistente. I controlli su converged e fitted.values restano.
+cells2x2 <- function(idx, motif, N) {
+  n <- length(idx); K <- length(motif); k <- sum(motif %in% idx)
+  c(k = k, n_k = n - k, K_k = K - k, resto = N - K - (n - k))
+}
+
+test_that("odds_ratio_one: una cella vuota della tabella 2x2 -> NA e nota, nessun avviso", {
+  toy <- make_toy(N = 300)
+  cases <- list(
+    list(zero = "k",     idx = 1:60,  motif = 101:140),   # k = 0: nessun gene della lista ha il sito
+    list(zero = "n_k",   idx = 1:60,  motif = 1:80),      # n - k = 0: lista tutta dentro il motivo
+    list(zero = "K_k",   idx = 1:60,  motif = 1:40),      # K - k = 0: motivo contenuto nella lista
+    list(zero = "resto", idx = 1:200, motif = 151:300))   # N - K - (n - k) = 0: tutti i geni senza sito sono in lista
+  for (cs in cases) {
+    expect_equal(unname(cells2x2(cs$idx, cs$motif, 300)[cs$zero]), 0, info = paste("fixture:", cs$zero))
+    res <- NULL
+    expect_no_warning(res <- odds_ratio_one(cs$idx, cs$motif, toy$genes))
+    expect_true(all(is.na(res[, c("beta", "se", "or", "or_low", "or_high")])), info = cs$zero)
+    expect_equal(res$note, "separazione o non convergenza", info = cs$zero)
+  }
+})
+
+test_that("odds_ratio_one: 59 su 60 in lista (nessuna cella vuota) resta 'ok' con OR finito", {
+  toy <- make_toy(N = 300)
+  motif <- c(1:59, 101)                          # k = 59, n - k = 1, K - k = 1, resto = 239
+  expect_true(all(cells2x2(1:60, motif, 300) > 0))
+  res <- odds_ratio_one(1:60, motif, toy$genes)
+  expect_equal(res$note, "ok")
+  expect_true(is.finite(res$or))
+  expect_gt(res$or, 1)
+})
+
+# glm non deve essere chiamato quando una cella e' vuota. Si osserva mettendo una copia di
+# glm che conta le chiamate nell'ambiente globale (dove source() ha definito le funzioni) e
+# togliendola alla fine. Controllo positivo: nel caso normale glm e' chiamato 1 volta, quindi
+# il conteggio funziona davvero.
+test_that("odds_ratio_one: con una cella vuota glm non viene chiamato (controllo positivo incluso)", {
+  toy <- make_toy(N = 300)
+  calls <- 0
+  assign("glm", function(...) { calls <<- calls + 1; stats::glm(...) }, envir = globalenv())
+  tryCatch({
+    odds_ratio_one(1:60, c(1:40, 101:140), toy$genes)       # normale
+    expect_equal(calls, 1)
+    calls <- 0
+    odds_ratio_one(1:60, 101:140, toy$genes)                # k = 0
+    odds_ratio_one(1:60, 1:80, toy$genes)                   # n - k = 0
+    odds_ratio_one(1:60, 1:40, toy$genes)                   # K - k = 0
+    odds_ratio_one(1:200, 151:300, toy$genes)               # N - K - (n - k) = 0
+    expect_equal(calls, 0)
+  }, finally = rm("glm", envir = globalenv()))
+})

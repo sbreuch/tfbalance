@@ -217,3 +217,65 @@ random_list <- function(genes, n, biased = FALSE, by = "gc", power = 2) {
   x[x <= 0] <- min(x[x > 0])             # valore <= 0 vale come il minimo positivo
   sort(sample.int(N, n, prob = (x / mean(x))^power))
 }
+
+# ---------------------------------------------------------------------------
+# odds_ratio_one: odds ratio di UN motivo, con glm() vero (circa 0.1 s: per tutti i
+# motivi sarebbe troppo lento, vedi lo score test sopra). Stesso modello di
+# enrich_corrected: in_list ~ has_site + gc + log1p(total_sites_noext).
+# Restituisce una riga: beta (coefficiente di has_site), se, or = exp(beta),
+# or_low e or_high = exp(beta -/+ qnorm(0.975) * se) (Wald 95%), note.
+#
+# note = "ok"                             stima valida.
+# note = "has_site costante"              il motivo ha K = 0 o K = N geni: niente da stimare.
+# note = "separazione o non convergenza"  una cella della tabella 2x2 has_site x in_list e'
+#                                         zero (stima inesistente, glm NON e' chiamato), oppure
+#                                         glm non converge, o le probabilita' stimate sono
+#                                         numericamente 0 o 1, o il coefficiente non e' finito.
+# Negli ultimi due casi beta, se, or, or_low, or_high sono NA.
+#
+# Come si riconosce la separazione. (1) Prima di glm, dalle quattro celle k, n - k, K - k,
+# N - K - (n - k): una cella vuota basta. Cattura anche la separazione parziale, che glm.fit
+# non segnala (misurato: x = 0 dava OR = 3e-8 con se = 1029 e nota "ok"). Nessuna soglia su
+# beta o se. (2) Dopo glm, con gli stessi due criteri di stats::glm.fit (letto in R 4.6.2):
+# fit$converged, e per la binomiale any(mu < eps | mu > 1 - eps) con
+# eps = 10 * .Machine$double.eps. fit$boundary (avviso "stopped at boundary value") NON e'
+# usato. Mai dal testo degli avvisi di glm (i messaggi di R sono tradotti nella lingua del
+# sistema). Gli avvisi di glm sono silenziati (muffleWarning) e non escono dalla funzione.
+# "has_site costante" ha la precedenza sulle celle vuote.
+# Gli errori di glm NON sono catturati: in casi estremi glm.fit puo' dare un errore
+# ("no valid set of coefficients"), che qui uscirebbe.
+# Indici di motif_genes fuori da 1..N sono ignorati (si usa %in%).
+odds_ratio_one <- function(idx, motif_genes, genes) {
+  N <- nrow(genes)
+  check_list(idx, N)
+  has <- seq_len(N) %in% motif_genes
+  z975 <- qnorm(0.975)
+  out <- function(note, beta = NA_real_, se = NA_real_)
+    data.frame(beta = beta, se = se, or = exp(beta),
+               or_low = exp(beta - z975 * se), or_high = exp(beta + z975 * se),
+               note = note, stringsAsFactors = FALSE)
+
+  if (sum(has) == 0 || sum(has) == N) return(out("has_site costante"))
+
+  # Tabella 2x2 has_site x in_list: k = geni della lista con il sito, n = geni della
+  # lista, K = geni con il sito. Se una delle quattro celle e' zero la stima di massima
+  # verosimiglianza non esiste (separazione completa o parziale): glm darebbe un numero
+  # enorme senza avvisare. Allora NA, senza chiamare glm.
+  n <- length(idx); K <- sum(has); k <- sum(has[idx])
+  if (k == 0 || n - k == 0 || K - k == 0 || N - K - (n - k) == 0)
+    return(out("separazione o non convergenza"))
+
+  muffle <- function(w) invokeRestart("muffleWarning")
+  d <- data.frame(y = as.numeric(seq_len(N) %in% idx), has = as.numeric(has),
+                  gc = genes$gc, ls = log1p(genes$total_sites_noext))
+  fit <- withCallingHandlers(glm(y ~ has + gc + ls, family = binomial(), data = d),
+                             warning = muffle)
+  eps <- 10 * .Machine$double.eps        # lo stesso di glm.fit
+  mu <- fit$fitted.values
+  beta <- unname(coef(fit)["has"])
+  if (!fit$converged || any(mu < eps | mu > 1 - eps) || is.na(beta))
+    return(out("separazione o non convergenza"))
+  se <- withCallingHandlers(summary(fit)$coefficients["has", "Std. Error"], warning = muffle)
+  if (!is.finite(beta) || !is.finite(se)) return(out("separazione o non convergenza"))
+  out("ok", beta = beta, se = unname(se))
+}
