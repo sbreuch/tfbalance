@@ -1,0 +1,16 @@
+300 liste x 852 motivi calcolati in 162 s | p mancanti (NA): 0
+motivi con E >= 10: 728 (test: 218400)
+
+(i)  q_c10 (BH su 728 motivi): 0.053 (SE 0.013)  soglia <= 0.09
+(ii) frazione di p < 0.001 su E >= 10: 0.00132 (eventi 288, attesi 218.4, rapporto 1.32)  soglia <= 0.002
+
+== (senza criterio) frazione di p < 0.001 per fascia di E >= 10 ==
+   fascia motivi   test eventi attesi frazione se_liste rapporto
+ 10<=E<20     74  22200     51   22.2  0.00230  0.00038     2.30
+ 20<=E<50    127  38100     69   38.1  0.00181  0.00022     1.81
+    E>=50    527 158100    168  158.1  0.00106  0.00010     1.06
+
+(senza criterio) q_c su tutti i 852 motivi (BH su 852): 0.130 (SE 0.019)
+
+CRITERI: (i) q_c10 <= 0.09: TRUE | (ii) frazione p<0.001 (E>=10) <= 0.002: TRUE 
+H2 CONFERMATA

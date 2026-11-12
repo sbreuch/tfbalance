@@ -51,3 +51,4 @@ rsconnect/
 CLAUDE.md
 .claude/
 data-raw/*.txt
+data-raw/validation/*_uniform_scores.rds

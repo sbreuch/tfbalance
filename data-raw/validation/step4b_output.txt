@@ -1,0 +1,27 @@
+== (a) liste casuali di geni reali: modello nullo, R = 500 per n ==
+  n liste avviso non_converge tutti_NA % tutti_NA
+  3   500      1            0        1        0.2
+  5   500      0            0        0        0.0
+ 10   500      0            0        0        0.0
+Problema (> 1% tutti NA) per qualche n: FALSE 
+
+== (b) enrich_corrected completo sulle prime 100 liste di ogni n ==
+  n liste_ok motivi_NA_max min_v_rel quota_p05_media
+  3       99             0   0.00024           0.061
+  5      100             0   0.00080           0.064
+ 10      100             0   0.00260           0.064
+
+== (c) liste avversarie (deterministiche) ==
+  n            lista avviso converge tutti_NA
+  3     gc piu' alto   TRUE    FALSE     TRUE
+  3    gc piu' basso   TRUE    FALSE     TRUE
+  3  noext piu' alto   TRUE    FALSE     TRUE
+  3 noext piu' basso   TRUE    FALSE     TRUE
+  5     gc piu' alto   TRUE    FALSE     TRUE
+  5    gc piu' basso   TRUE    FALSE     TRUE
+  5  noext piu' alto   TRUE    FALSE     TRUE
+  5 noext piu' basso   TRUE    FALSE     TRUE
+ 10     gc piu' alto   TRUE    FALSE     TRUE
+ 10    gc piu' basso   TRUE    FALSE     TRUE
+ 10  noext piu' alto   TRUE    FALSE     TRUE
+ 10 noext piu' basso   TRUE    FALSE     TRUE

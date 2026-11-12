@@ -1,0 +1,30 @@
+[ 1/13] uniform            power=   0  L=300   175 s
+[ 2/13] gc                 power=   2  L=100    61 s
+[ 3/13] total_sites_noext  power=   2  L=100    60 s
+[ 4/13] gc                 power=   5  L=100    61 s
+[ 5/13] total_sites_noext  power=   5  L=100    61 s
+[ 6/13] gc                 power=  10  L=100    62 s
+[ 7/13] total_sites_noext  power=  10  L=100    62 s
+[ 8/13] gc                 power=  -2  L=100    61 s
+[ 9/13] total_sites_noext  power=  -2  L=100    61 s
+[10/13] gc                 power=  -5  L=100    61 s
+[11/13] total_sites_noext  power=  -5  L=100    62 s
+[12/13] gc                 power= -10  L=100    63 s
+[13/13] total_sites_noext  power= -10  L=100    62 s
+               var power   L shift_gc shift_nx   r_b se_rb  q_b   r_c se_rc   q_c nullfail baseline_gonfiato corretto_tarato
+           uniform     0 300    0.004   -0.003 0.041 0.001 0.04 0.053 0.001 0.183        0             FALSE           FALSE
+                gc     2 100    0.385   -0.055 0.151 0.002 1.00 0.057 0.001 0.140        0              TRUE            TRUE
+ total_sites_noext     2 100   -0.090    0.400 0.111 0.004 0.55 0.053 0.001 0.110        0              TRUE            TRUE
+                gc     5 100    0.904   -0.001 0.222 0.001 1.00 0.066 0.002 0.180        0              TRUE           FALSE
+ total_sites_noext     5 100   -0.287    1.173 0.244 0.003 1.00 0.052 0.001 0.110        0              TRUE            TRUE
+                gc    10 100    1.533    0.261 0.236 0.001 1.00 0.062 0.002 0.180        0              TRUE           FALSE
+ total_sites_noext    10 100   -0.668    2.479 0.318 0.002 1.00 0.049 0.002 0.100        0              TRUE            TRUE
+                gc    -2 100   -0.399    0.152 0.226 0.004 0.97 0.047 0.001 0.210        0              TRUE           FALSE
+ total_sites_noext    -2 100    0.056   -0.357 0.034 0.001 0.03 0.053 0.001 0.140        0             FALSE            TRUE
+                gc    -5 100   -0.939    0.559 0.348 0.001 1.00 0.045 0.001 0.090        0              TRUE            TRUE
+ total_sites_noext    -5 100    0.120   -0.859 0.037 0.001 0.15 0.053 0.001 0.160        0             FALSE           FALSE
+                gc   -10 100   -1.530    1.196 0.375 0.001 1.00 0.047 0.001 0.220        0              TRUE           FALSE
+ total_sites_noext   -10 100    0.163   -1.537 0.043 0.001 0.63 0.052 0.001 0.120        0             FALSE            TRUE
+
+CONTROLLO uniforme (corretto TARATO): FALSE 
+uscito con codice 0
