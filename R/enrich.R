@@ -84,3 +84,78 @@ enrich_baseline <- function(idx, hits, n_genes) {
              p = p, fdr = p.adjust(p, "BH"),
              stringsAsFactors = FALSE)
 }
+
+# ---------------------------------------------------------------------------
+# Test corretto: test di punteggio (score) per il modello logistico
+#   in_list ~ has_site + gc + log1p(total_sites_noext)
+# Perche' lo score: glm() per ognuno dei ~1000 motivi sui 35.150 geni richiede
+# ~90 s; lo score adatta UNA volta il modello senza has_site e poi, per ogni
+# motivo, somma qualche numero sui soli geni che hanno il sito (niente matrici
+# 35.150 x 1019).
+
+# Soglia della guardia: un motivo vale NA se v / sum(w) < SCORE_VAR_MIN.
+# v = informazione di has_site dopo aver tolto quella spiegata dalle covariate;
+# sum(w) = informazione totale del modello nullo. E' relativa perche' v scala con
+# la lista; 1e-8 sta ~8 ordini sopra il rumore di arrotondamento (~1e-16) e ben
+# sotto l'informazione di un singolo gene. Vedi i test per le misure.
+SCORE_VAR_MIN <- 1e-8
+
+# score_fit (uso interno): per ogni motivo restituisce z (senza guardie), v_rel =
+# v / sum(w) e K. Restituisce NULL se il modello senza motivo non e' stimabile
+# (non converge o glm.fit avverte, ad es. separazione perfetta).
+score_fit <- function(idx, hits, genes) {
+  N <- nrow(genes)
+  y <- numeric(N)                        # 1 = gene nella lista
+  y[idx] <- 1
+  # covariate standardizzate (media 0, sd 1): stesso test, ma calcoli piu' stabili
+  Z <- cbind(1, as.numeric(scale(genes$gc)),
+             as.numeric(scale(log1p(genes$total_sites_noext))))
+  if (anyNA(Z))
+    stop("gc e total_sites_noext devono essere numeri non costanti e senza NA", call. = FALSE)
+
+  # modello nullo: solo intercetta, gc e densita' (senza has_site)
+  warned <- FALSE
+  fit0 <- withCallingHandlers(
+    glm.fit(Z, y, family = binomial()),
+    warning = function(w) { warned <<- TRUE; invokeRestart("muffleWarning") })
+  if (warned || !fit0$converged) return(NULL)
+
+  mu <- fit0$fitted.values               # probabilita' stimate di stare in lista
+  w <- mu * (1 - mu)                     # pesi del modello logistico
+  r <- y - mu                            # residui
+  wZ <- w * Z                            # N x 3: l'unica matrice, non N x motivi
+  Iinv <- solve(crossprod(Z, wZ))        # inversa dell'informazione delle covariate
+  I_tot <- sum(w)
+
+  one <- function(h) {
+    i <- h$genes                         # solo i geni con il sito: si lavora sugli indici
+    b <- colSums(wZ[i, , drop = FALSE])
+    v <- sum(w[i]) - drop(b %*% Iinv %*% b)
+    c(z = if (v > 0) sum(r[i]) / sqrt(v) else NA_real_, v_rel = v / I_tot)
+  }
+  out <- as.data.frame(t(vapply(hits, one, c(z = 0, v_rel = 0))))
+  out$K <- lengths(lapply(hits, `[[`, "genes"))
+  out
+}
+
+# enrich_corrected: z e p (una coda: arricchimento) per ogni motivo, e fdr = BH
+# calcolato sui motivi passati; i motivi non testabili (NA) non contano in m.
+enrich_corrected <- function(idx, hits, genes) {
+  N <- nrow(genes)
+  check_list(idx, N)
+  sf <- score_fit(idx, hits, genes)
+  if (is.null(sf)) {
+    warning("il modello senza motivo non e' stimabile (lista troppo piccola o ",
+            "separabile dalle covariate): risultati NA", call. = FALSE)
+    z <- rep(NA_real_, length(hits))
+  } else {
+    z <- sf$z
+    # K = 0 o K = N: has_site e' costante. Poi la guardia relativa sulla varianza.
+    z[sf$K == 0 | sf$K == N | !(sf$v_rel >= SCORE_VAR_MIN)] <- NA
+  }
+  p <- pnorm(z, lower.tail = FALSE)      # P(Z > z): grande z = arricchimento
+  data.frame(id = vapply(hits, function(h) h$id, ""),
+             tf = vapply(hits, function(h) h$tf, ""),
+             z = z, p = p, fdr = p.adjust(p, "BH"),
+             stringsAsFactors = FALSE)
+}

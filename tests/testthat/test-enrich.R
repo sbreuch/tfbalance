@@ -12,7 +12,7 @@ source(testthat::test_path("..", "..", "R", "enrich.R"))
 
 # --- fixture --------------------------------------------------------------
 # N geni con colonne come genes.rds; M motivi con "genes" = indici di riga.
-make_toy <- function(N = 200, M = 8, seed = 1) {
+make_toy <- function(N = 200, M = 8, seed = 1, K = 40) {   # K = geni con sito per motivo
   set.seed(seed)
   genes <- data.frame(
     entrez = as.character(1000L + seq_len(N)),   # come genes.rds: testo, non numero
@@ -25,7 +25,7 @@ make_toy <- function(N = 200, M = 8, seed = 1) {
   )
   hits <- lapply(seq_len(M), function(j) {
     list(id = sprintf("MA%04d.1", j), tf = paste0("TF", j), L = 8L,
-         genes = sort(sample(N, 40)))
+         genes = sort(sample(N, K)))
   })
   list(genes = genes, hits = hits)
 }
@@ -186,25 +186,50 @@ test_that("enrich_baseline: liste non valide sono errori con messaggio chiaro", 
 })
 
 # === enrich_corrected =======================================================
+# Test di punteggio (score) sul modello in_list ~ has_site + gc + log1p(total_sites_noext).
+#
+# GUARDIA SULLA VARIANZA DELLO SCORE (dichiarata prima del codice)
+# Per un motivo, z = U / sqrt(v), con v = informazione di `has_site` DOPO aver tolto
+# quella gia' spiegata da intercetta, gc e densita'. v e' una differenza di due numeri
+# grandi: se `has_site` e' (quasi) l'intercetta (K = N) v e' solo rumore di
+# arrotondamento e z = U / sqrt(rumore) sarebbe un numero casuale. Il motivo vale NA se
+#     K == 0   oppure   K == N   oppure   v / sum(w) < SCORE_VAR_MIN,   SCORE_VAR_MIN = 1e-8
+# dove sum(w) e' l'informazione totale del modello nullo (w = mu * (1 - mu)).
+# Perche' RELATIVA: v scala con la dimensione della lista (w e' minuscolo per liste
+# piccole), una soglia assoluta sarebbe arbitraria. Perche' 1e-8: l'errore di arrotondamento
+# e' ~1e-16 * sum(w), quindi 1e-8 sta 8 ordini sopra il rumore; e sta molto sotto
+# l'informazione vera anche di un solo gene (K = N - 1 o K = 1: v ~ w di quel gene,
+# v / sum(w) ~ 1e-3 .. 1e-5). K = N - 1 NON e' scartato: e' un motivo quasi costante
+# ma informativo. Il test "la soglia sta nel divario" lo verifica sull'implementazione.
+
+# BH a mano: gli NA restano NA e non contano in m (numero di test validi)
+bh_hand <- function(p) {
+  ok <- !is.na(p); m <- sum(ok); out <- rep(NA_real_, length(p))
+  q <- p[ok]; o <- order(q, decreasing = TRUE)
+  f <- numeric(m); f[o] <- cummin(q[o] * m / (m:1))
+  out[ok] <- pmin(f, 1)
+  out
+}
 
 test_that("enrich_corrected trova un segnale forte e piantato", {
   toy <- make_toy(N = 300)
   toy$hits[[1]]$genes <- 1:80                    # motivo A: geni 1..80
-  # lista: 50 geni con A + 10 senza. Se tutti i geni senza A fossero fuori lista
-  # ci sarebbe separazione perfetta e il p-value di Wald crollerebbe (vedi sotto).
-  idx <- c(1:50, 101:110)
+  idx <- c(1:50, 101:110)                        # lista: 50 geni con A + 10 senza
   res <- enrich_corrected(idx, toy$hits, toy$genes)
-  expect_equal(nrow(res), length(toy$hits))
+  expect_named(res, c("id", "tf", "z", "p", "fdr"))
+  expect_equal(res$id, vapply(toy$hits, function(h) h$id, ""))
   expect_equal(which.min(res$p), 1)
   expect_lt(res$p[1], 1e-6)
-  expect_gt(res$or[1], 1)
-  expect_equal(res$or[1], exp(res$beta[1]))
+  expect_gt(res$z[1], 0)
 })
 
-test_that("enrich_corrected: fdr = Benjamini-Hochberg dei p (NA esclusi)", {
+test_that("enrich_corrected: fdr = BH fatto a mano; gli NA non contano in m", {
   toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- seq_len(300)            # K = N -> p = NA
   res <- enrich_corrected(1:60, toy$hits, toy$genes)
-  expect_equal(res$fdr, p.adjust(res$p, "BH"))
+  expect_true(is.na(res$p[1]) && is.na(res$fdr[1]))
+  expect_equal(res$fdr, bh_hand(res$p))
+  expect_equal(sum(!is.na(res$fdr)), length(toy$hits) - 1)
 })
 
 # Il test che conta: confondimento da GC. Il motivo B non ha alcun effetto
@@ -233,20 +258,112 @@ test_that("enrich_corrected riduce il falso positivo da confondimento GC", {
   expect_gt(corr$p, base$p)
 })
 
-test_that("enrich_corrected: motivo senza siti nella lista non va in errore", {
+test_that("enrich_corrected: motivo senza geni della lista -> z negativo, nessun errore", {
   toy <- make_toy(N = 300)
   toy$hits[[1]]$genes <- 201:240                 # nessun gene della lista 1:60
   res <- enrich_corrected(1:60, toy$hits, toy$genes)
   expect_equal(nrow(res), length(toy$hits))
-  expect_true(is.na(res$p[1]) || res$p[1] > 0.5)
+  expect_lt(res$z[1], 0)
+  expect_gt(res$p[1], 0.5)
 })
 
-test_that("enrich_corrected: motivo presente in tutti i geni -> p = NA, nessun errore", {
+test_that("enrich_corrected: K = 0 e K = N danno NA; K = N - 1 e K = 1 un z finito", {
   toy <- make_toy(N = 300)
-  toy$hits[[1]]$genes <- seq_len(300)
+  toy$hits[[1]]$genes <- integer(0)              # K = 0
+  toy$hits[[2]]$genes <- seq_len(300)            # K = N
+  toy$hits[[3]]$genes <- 2:300                   # K = N - 1: manca il gene 1 (in lista)
+  toy$hits[[4]]$genes <- 1:299                   # K = N - 1: manca il gene 300 (fuori lista)
+  toy$hits[[5]]$genes <- 7L                      # K = 1
   res <- enrich_corrected(1:60, toy$hits, toy$genes)
-  expect_equal(nrow(res), length(toy$hits))
-  expect_true(is.na(res$p[1]))
+  expect_true(all(is.na(res$z[1:2]) & is.na(res$p[1:2]) & is.na(res$fdr[1:2])))
+  expect_true(all(is.finite(res$z[3:5])))
+  expect_true(all(is.finite(res$p[3:5])))
+})
+
+# Lista interamente dentro il motivo: tutti i 60 geni della lista hanno il sito e
+# nessuno ne e' privo (il motivo ne ha anche altri 20 fuori lista, quindi K = 80 < N).
+# Atteso, dichiarato prima di eseguire: z finito, z > 0, p < 1e-6.
+test_that("enrich_corrected: lista tutta dentro il motivo -> z finito e positivo, p < 1e-6", {
+  toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- 1:80                    # motivo: geni 1..80
+  idx <- 1:60                                    # lista: tutti con il sito, nessuno senza
+  res <- enrich_corrected(idx, toy$hits, toy$genes)
+  expect_true(is.finite(res$z[1]))
+  expect_gt(res$z[1], 0)
+  expect_lt(res$p[1], 1e-6)
+})
+
+test_that("enrich_corrected: liste e covariate non valide sono errori chiari", {
+  toy <- make_toy(N = 300)
+  expect_error(enrich_corrected(integer(0), toy$hits, toy$genes), "vuota")
+  expect_error(enrich_corrected(c(1, 1, 2), toy$hits, toy$genes), "ripetuti")
+  g2 <- toy$genes; g2$gc <- 0.5                  # gc costante: non si puo' standardizzare
+  expect_error(enrich_corrected(1:60, toy$hits, g2), "non costanti")
+})
+
+test_that("enrich_corrected: modello nullo non stimabile -> tutti NA e un avviso", {
+  toy <- make_toy(N = 300)
+  toy$genes$gc <- sort(toy$genes$gc)             # gc cresce col numero di riga
+  idx <- 296:300                                 # i 5 geni a gc piu' alto: gc li separa da soli
+  expect_warning(res <- enrich_corrected(idx, toy$hits, toy$genes), "non e' stimabile")
+  expect_true(all(is.na(res$z)))
+})
+
+test_that("la soglia SCORE_VAR_MIN sta nel divario tra rumore e informazione vera", {
+  toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- seq_len(300)            # K = N: solo rumore
+  toy$hits[[2]]$genes <- 2:300                   # K = N - 1
+  toy$hits[[3]]$genes <- 7L                      # K = 1
+  sf <- score_fit(1:60, toy$hits, toy$genes)     # funzione interna: z e v / sum(w)
+  expect_equal(SCORE_VAR_MIN, 1e-8)
+  expect_lt(abs(sf$v_rel[1]), SCORE_VAR_MIN / 100)   # rumore: < 1e-10
+  expect_gt(sf$v_rel[2], SCORE_VAR_MIN * 100)        # informazione vera: > 1e-6
+  expect_gt(sf$v_rel[3], SCORE_VAR_MIN * 100)
+  expect_gt(min(sf$v_rel[-(1:3)]), 1e-3)             # motivi normali (K = 40 su 300)
+})
+
+# Test esatto: z^2 dello score = statistica "Rao" di anova(modello nullo, modello pieno).
+# Tolleranza relativa 1e-4. Include un motivo con x = 0 (anche Rao usa il modello nullo).
+test_that("enrich_corrected: z^2 coincide con il test di Rao di anova()", {
+  toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- 1:80                    # segnale piantato
+  toy$hits[[2]]$genes <- 201:240                 # nessun gene della lista (x = 0)
+  idx <- c(1:50, 101:110)
+  res <- enrich_corrected(idx, toy$hits, toy$genes)
+  d <- data.frame(y = as.numeric(seq_len(300) %in% idx), gc = toy$genes$gc,
+                  ls = log1p(toy$genes$total_sites_noext))
+  fit_null <- glm(y ~ gc + ls, binomial, d)
+  for (j in seq_along(toy$hits)) {
+    d$has <- as.numeric(seq_len(300) %in% toy$hits[[j]]$genes)
+    fit_full <- glm(y ~ has + gc + ls, binomial, d)
+    rao <- anova(fit_null, fit_full, test = "Rao")$Rao[2]
+    expect_equal(res$z[j]^2, rao, tolerance = 1e-4, info = paste("motivo", j))
+  }
+  expect_gt(res$z[1], 0)                         # il segno si controlla a parte
+  expect_lt(res$z[2], 0)
+})
+
+# TARATURA (dichiarata prima di eseguire). Fixture: N = 2000, M = 20 motivi indipendenti
+# con K = 400 geni, L = 200 liste casuali di n = 100 geni: 4000 test per metodo, quota
+# attesa di p < 0.05 pari a 0.05. I motivi nella stessa lista possono essere correlati:
+# effetto di disegno 1 + (M - 1) * rho con rho = 0.1 (prudente) = 2.9, quindi
+# SE = sqrt(0.05 * 0.95 / 4000 * 2.9) = 0.0059 e intervallo = 0.05 +- 4 SE.
+#   corretto: [0.027, 0.073]     baseline (test discreto, esatto, conservativo): [0.02, 0.073]
+# Se fallisce non cambio l'intervallo: indago.
+test_that("taratura: su liste casuali p < 0.05 capita nella quota attesa", {
+  toy <- make_toy(N = 2000, M = 20, K = 400, seed = 11)
+  set.seed(100)
+  pb <- pc <- numeric(0)
+  for (l in 1:200) {
+    idx <- sort(sample(2000, 100))
+    pb <- c(pb, enrich_baseline(idx, toy$hits, 2000)$p)
+    pc <- c(pc, enrich_corrected(idx, toy$hits, toy$genes)$p)
+  }
+  expect_length(pc, 4000)
+  expect_false(anyNA(pc))
+  rb <- mean(pb < 0.05); rc <- mean(pc < 0.05)
+  expect_true(rc >= 0.027 && rc <= 0.073, info = paste("corretto:", rc))
+  expect_true(rb >= 0.02 && rb <= 0.073, info = paste("baseline:", rb))
 })
 
 # === random_list ============================================================
