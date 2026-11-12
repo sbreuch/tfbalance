@@ -138,11 +138,33 @@ score_fit <- function(idx, hits, genes) {
   out
 }
 
-# enrich_corrected: z e p (una coda: arricchimento) per ogni motivo, e fdr = BH
-# calcolato sui motivi passati; i motivi non testabili (NA) non contano in m.
-enrich_corrected <- function(idx, hits, genes) {
+# enrich_corrected: z e p (una coda: arricchimento) per ogni motivo, e fdr = BH.
+#
+# min_expected (default 10): i motivi con E = n * K / N < min_expected (n = geni della
+# lista, K = geni con il sito, N = tutti i geni) hanno z, p, fdr = NA ma restano nelle
+# righe; E == min_expected e' incluso. La colonna `expected` e' sempre E. Il BH e'
+# calcolato solo sui motivi tenuti: gli NA (E bassa, K = 0, K = N, guardia sulla
+# varianza, modello nullo non stimabile) non contano in m. min_expected = 0 non
+# esclude nessun motivo.
+#
+# Perche' 10: esperimento H2 (data-raw/validation/step4d_E10.R, output in
+# step4d_output.txt). 300 liste uniformi nuove di n = 300 geni reali (seed 4300), 728
+# motivi con E >= 10: q_c10 = 0.053 (soglia dichiarata <= 0.09) e frazione di p < 0.001
+# = 0.00132 (soglia <= 0.002), cioe' test tarato. Sotto 10 non e' validato (step4c: con
+# E < 5 la frazione di p < 0.001 era 4.04 volte l'attesa).
+#
+# Residuo noto (step4d, senza criterio): nelle fasce 10 <= E < 20 e 20 <= E < 50 la
+# frazione di p < 0.001 e' 2.3 e 1.8 volte l'attesa (E >= 50: 1.06). Validato solo con
+# n = 300 e liste uniformi. Con liste piccole pochi motivi raggiungono E >= 10: a n = 10
+# nessuno dei 852 motivi del filtro di default (step4c), quindi tutto NA.
+enrich_corrected <- function(idx, hits, genes, min_expected = 10) {
+  if (!is.numeric(min_expected) || length(min_expected) != 1 ||
+      !is.finite(min_expected) || min_expected < 0)
+    stop("`min_expected` deve essere un numero singolo finito >= 0", call. = FALSE)
   N <- nrow(genes)
   check_list(idx, N)
+  K <- lengths(lapply(hits, `[[`, "genes"))
+  E <- length(idx) * K / N               # geni attesi con il sito (n * K / N, come in enrich_baseline)
   sf <- score_fit(idx, hits, genes)
   if (is.null(sf)) {
     warning("il modello senza motivo non e' stimabile (lista troppo piccola o ",
@@ -153,9 +175,10 @@ enrich_corrected <- function(idx, hits, genes) {
     # K = 0 o K = N: has_site e' costante. Poi la guardia relativa sulla varianza.
     z[sf$K == 0 | sf$K == N | !(sf$v_rel >= SCORE_VAR_MIN)] <- NA
   }
+  z[E < min_expected] <- NA              # pochi geni attesi: la riga resta, il test no
   p <- pnorm(z, lower.tail = FALSE)      # P(Z > z): grande z = arricchimento
   data.frame(id = vapply(hits, function(h) h$id, ""),
              tf = vapply(hits, function(h) h$tf, ""),
-             z = z, p = p, fdr = p.adjust(p, "BH"),
+             expected = E, z = z, p = p, fdr = p.adjust(p, "BH"),
              stringsAsFactors = FALSE)
 }

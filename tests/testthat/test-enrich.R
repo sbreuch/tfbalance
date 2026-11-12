@@ -215,8 +215,8 @@ test_that("enrich_corrected trova un segnale forte e piantato", {
   toy <- make_toy(N = 300)
   toy$hits[[1]]$genes <- 1:80                    # motivo A: geni 1..80
   idx <- c(1:50, 101:110)                        # lista: 50 geni con A + 10 senza
-  res <- enrich_corrected(idx, toy$hits, toy$genes)
-  expect_named(res, c("id", "tf", "z", "p", "fdr"))
+  res <- enrich_corrected(idx, toy$hits, toy$genes, min_expected = 0)
+  expect_named(res, c("id", "tf", "expected", "z", "p", "fdr"))
   expect_equal(res$id, vapply(toy$hits, function(h) h$id, ""))
   expect_equal(which.min(res$p), 1)
   expect_lt(res$p[1], 1e-6)
@@ -226,7 +226,7 @@ test_that("enrich_corrected trova un segnale forte e piantato", {
 test_that("enrich_corrected: fdr = BH fatto a mano; gli NA non contano in m", {
   toy <- make_toy(N = 300)
   toy$hits[[1]]$genes <- seq_len(300)            # K = N -> p = NA
-  res <- enrich_corrected(1:60, toy$hits, toy$genes)
+  res <- enrich_corrected(1:60, toy$hits, toy$genes, min_expected = 0)
   expect_true(is.na(res$p[1]) && is.na(res$fdr[1]))
   expect_equal(res$fdr, bh_hand(res$p))
   expect_equal(sum(!is.na(res$fdr)), length(toy$hits) - 1)
@@ -261,7 +261,7 @@ test_that("enrich_corrected riduce il falso positivo da confondimento GC", {
 test_that("enrich_corrected: motivo senza geni della lista -> z negativo, nessun errore", {
   toy <- make_toy(N = 300)
   toy$hits[[1]]$genes <- 201:240                 # nessun gene della lista 1:60
-  res <- enrich_corrected(1:60, toy$hits, toy$genes)
+  res <- enrich_corrected(1:60, toy$hits, toy$genes, min_expected = 0)
   expect_equal(nrow(res), length(toy$hits))
   expect_lt(res$z[1], 0)
   expect_gt(res$p[1], 0.5)
@@ -274,7 +274,7 @@ test_that("enrich_corrected: K = 0 e K = N danno NA; K = N - 1 e K = 1 un z fini
   toy$hits[[3]]$genes <- 2:300                   # K = N - 1: manca il gene 1 (in lista)
   toy$hits[[4]]$genes <- 1:299                   # K = N - 1: manca il gene 300 (fuori lista)
   toy$hits[[5]]$genes <- 7L                      # K = 1
-  res <- enrich_corrected(1:60, toy$hits, toy$genes)
+  res <- enrich_corrected(1:60, toy$hits, toy$genes, min_expected = 0)
   expect_true(all(is.na(res$z[1:2]) & is.na(res$p[1:2]) & is.na(res$fdr[1:2])))
   expect_true(all(is.finite(res$z[3:5])))
   expect_true(all(is.finite(res$p[3:5])))
@@ -293,6 +293,19 @@ test_that("enrich_corrected: lista tutta dentro il motivo -> z finito e positivo
   expect_lt(res$p[1], 1e-6)
 })
 
+# Motivo = esattamente la lista (K = n = 60): has_site coincide con in_list, cioe'
+# separazione perfetta. Per il Wald di glm e' un caso patologico; lo score usa il
+# modello nullo (senza has_site), quindi deve dare un valore.
+# Atteso, dichiarato prima di eseguire: z finito, z > 0, p < 1e-6.
+test_that("enrich_corrected: motivo = esattamente la lista (K = n) -> z finito e positivo, p < 1e-6", {
+  toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- 1:60                    # il motivo coincide con la lista
+  res <- enrich_corrected(1:60, toy$hits, toy$genes)
+  expect_true(is.finite(res$z[1]))
+  expect_gt(res$z[1], 0)
+  expect_lt(res$p[1], 1e-6)
+})
+
 test_that("enrich_corrected: liste e covariate non valide sono errori chiari", {
   toy <- make_toy(N = 300)
   expect_error(enrich_corrected(integer(0), toy$hits, toy$genes), "vuota")
@@ -305,8 +318,88 @@ test_that("enrich_corrected: modello nullo non stimabile -> tutti NA e un avviso
   toy <- make_toy(N = 300)
   toy$genes$gc <- sort(toy$genes$gc)             # gc cresce col numero di riga
   idx <- 296:300                                 # i 5 geni a gc piu' alto: gc li separa da soli
-  expect_warning(res <- enrich_corrected(idx, toy$hits, toy$genes), "non e' stimabile")
+  expect_warning(res <- enrich_corrected(idx, toy$hits, toy$genes, min_expected = 0), "non e' stimabile")
   expect_true(all(is.na(res$z)))
+})
+
+# === min_expected: soglia sui geni attesi E ==================================
+# Regola dichiarata prima del codice (esperimento H2 confermato: il test corretto e'
+# tarato per E >= 10). E = n * K / N, calcolato moltiplicando prima di dividere (come
+# `expected` in enrich_baseline), con n = geni della lista, K = geni con il sito,
+# N = tutti i geni. Il motivo con E < min_expected (default 10) ha z, p, fdr = NA ma
+# RESTA nelle righe; E == min_expected e' incluso (E >= min_expected). La colonna
+# `expected` contiene E ed e' sempre riempita. Il BH e' calcolato solo sui motivi tenuti:
+# gli NA non contano in m. min_expected deve essere un numero singolo, finito, >= 0
+# (quindi NA e Inf sono errori).
+# Fixture: N = 300 e lista 1:60, quindi E = K / 5.
+
+test_that("enrich_corrected: min_expected vale 10 di default e `expected` = n*K/N", {
+  expect_equal(formals(enrich_corrected)$min_expected, 10)
+  toy <- make_toy(N = 300)
+  res <- enrich_corrected(1:60, toy$hits, toy$genes)       # K = 40 per tutti: E = 8
+  expect_equal(res$expected, rep(60 * 40 / 300, length(toy$hits)))
+})
+
+test_that("enrich_corrected: E < min_expected -> NA ma la riga resta; E = 10 esatto e' incluso", {
+  toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- 101:149                 # K = 49 -> E = 9.8  (escluso)
+  toy$hits[[2]]$genes <- 101:150                 # K = 50 -> E = 10   (incluso: E >= 10)
+  toy$hits[[3]]$genes <- 101:151                 # K = 51 -> E = 10.2 (incluso)
+  res <- enrich_corrected(1:60, toy$hits, toy$genes)
+  expect_equal(nrow(res), length(toy$hits))      # nessuna riga persa
+  expect_equal(res$expected[1:3], c(9.8, 10, 10.2))
+  expect_true(is.na(res$z[1]) && is.na(res$p[1]) && is.na(res$fdr[1]))
+  expect_true(all(is.finite(res$z[2:3])) && all(is.finite(res$p[2:3])))
+  expect_true(all(is.na(res$z[4:8])))            # gli altri: K = 40, E = 8
+})
+
+test_that("enrich_corrected: min_expected e' un parametro (con 12 esce E = 11, resta E = 12)", {
+  toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- 101:155                 # K = 55 -> E = 11
+  toy$hits[[2]]$genes <- 101:160                 # K = 60 -> E = 12 (incluso)
+  res <- enrich_corrected(1:60, toy$hits, toy$genes, min_expected = 12)
+  expect_true(is.na(res$z[1]))
+  expect_true(is.finite(res$z[2]))
+})
+
+test_that("enrich_corrected: il BH e' calcolato solo sui motivi tenuti (gli NA non contano in m)", {
+  toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- 1:80                    # E = 16, segnale forte
+  toy$hits[[2]]$genes <- 1:55                    # E = 11, segnale forte
+  toy$hits[[3]]$genes <- 101:160                 # E = 12, nessun gene della lista
+  res <- enrich_corrected(1:60, toy$hits, toy$genes)   # motivi 4..8: K = 40, E = 8 -> NA
+  expect_equal(sum(!is.na(res$fdr)), 3)          # m = 3, non 8
+  expect_equal(res$fdr, bh_hand(res$p))
+  # con m = 8 (tutti i motivi) l'fdr dei motivi forti sarebbe piu' grande: il test lo distingue
+  fdr_m8 <- p.adjust(res$p, "BH", n = length(toy$hits))
+  expect_lt(res$fdr[1], fdr_m8[1])
+})
+
+# Regressione: con min_expected = 0 il comportamento e' quello precedente alla regola.
+# Riferimenti calcolati con la versione SENZA min_expected (12/11): make_toy(N = 300),
+# motivi 1-5 con K = 0, N, N - 1 (gene 1 mancante), N - 1 (gene 300 mancante), 1; lista 1:60.
+test_that("enrich_corrected: min_expected = 0 riproduce il comportamento precedente", {
+  toy <- make_toy(N = 300)
+  toy$hits[[1]]$genes <- integer(0)
+  toy$hits[[2]]$genes <- seq_len(300)
+  toy$hits[[3]]$genes <- 2:300
+  toy$hits[[4]]$genes <- 1:299
+  toy$hits[[5]]$genes <- 7L
+  res <- enrich_corrected(1:60, toy$hits, toy$genes, min_expected = 0)
+  z_ref <- c(NA, NA, -1.9377799, 0.54261249, 1.7259265, -0.94329847, 1.2062664, -1.388163)
+  p_ref <- c(NA, NA, 0.97367496, 0.29369832, 0.042180315, 0.82723587, 0.11385739, 0.91745629)
+  fdr_ref <- c(NA, NA, 0.97367496, 0.58739664, 0.25308189, 0.97367496, 0.34157218, 0.97367496)
+  expect_equal(res$z, z_ref, tolerance = 1e-7)
+  expect_equal(res$p, p_ref, tolerance = 1e-7)
+  expect_equal(res$fdr, fdr_ref, tolerance = 1e-7)
+})
+
+test_that("enrich_corrected: min_expected non valido e' un errore con messaggio chiaro", {
+  toy <- make_toy(N = 300)
+  # messaggio atteso: "`min_expected` deve essere un numero singolo finito >= 0"
+  for (bad in list(-1, "10", NA_real_, c(5, 10), TRUE, NULL, Inf))
+    expect_error(enrich_corrected(1:60, toy$hits, toy$genes, min_expected = bad),
+                 "min_expected.*numero singolo finito", info = paste(deparse(bad), collapse = ""))
 })
 
 test_that("la soglia SCORE_VAR_MIN sta nel divario tra rumore e informazione vera", {
@@ -329,7 +422,7 @@ test_that("enrich_corrected: z^2 coincide con il test di Rao di anova()", {
   toy$hits[[1]]$genes <- 1:80                    # segnale piantato
   toy$hits[[2]]$genes <- 201:240                 # nessun gene della lista (x = 0)
   idx <- c(1:50, 101:110)
-  res <- enrich_corrected(idx, toy$hits, toy$genes)
+  res <- enrich_corrected(idx, toy$hits, toy$genes, min_expected = 0)
   d <- data.frame(y = as.numeric(seq_len(300) %in% idx), gc = toy$genes$gc,
                   ls = log1p(toy$genes$total_sites_noext))
   fit_null <- glm(y ~ gc + ls, binomial, d)
