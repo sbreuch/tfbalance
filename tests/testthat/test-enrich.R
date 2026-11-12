@@ -6,7 +6,7 @@
 #   enrich_baseline(idx, hits, n_genes)   -> data.frame(id, tf, k, K, expected, p, fdr)
 #   enrich_corrected(idx, hits, genes)    -> data.frame(id, tf, z, p, fdr)   # test di punteggio
 #   odds_ratio_one(idx, motif_genes, genes) -> data.frame(beta, se, or, or_low, or_high, note)
-#   random_list(genes, n, biased = FALSE, by = "gc", power = 10) -> indici di riga
+#   random_list(genes, n, biased = FALSE, by = "gc", power = 2) -> indici di riga, ordinati
 
 source(testthat::test_path("..", "..", "R", "enrich.R"))
 
@@ -509,4 +509,94 @@ test_that("random_list biased by total_sites_noext: densita' media piu' alta", {
   m_b <- mean(replicate(20, mean(d[random_list(toy$genes, 300, biased = TRUE,
                                               by = "total_sites_noext")])))
   expect_gt(m_b, m_u)
+})
+
+# --- Passo 5: regola del peso, direzione, errori -------------------------------
+# Dichiarato prima del codice. Peso = (valore / media)^power, come nello script della
+# griglia (data-raw/validation/step4_bias_calibration.R): power > 0 favorisce i valori
+# alti, power < 0 i bassi. Default: biased = FALSE (uniforme); con biased = TRUE il
+# default e' by = "gc" e power = 2. Il risultato e' ordinato, come nella griglia.
+# Con lo stesso seed e gli stessi argomenti, random_list deve coincidere con
+#   sort(sample.int(N, n, prob = (x / mean(x))^power))     (uniforme: sort(sample.int(N, n)))
+# Un valore <= 0 della colonna vale come il minimo positivo, per qualunque segno di power.
+
+test_that("random_list: coincide con sort(sample.int(N, n, prob = (x/mean(x))^power))", {
+  toy <- make_toy(N = 500)
+  N <- 500; g <- toy$genes; d <- g$total_sites_noext
+  set.seed(11); a <- random_list(g, 50, biased = TRUE)           # default: by = "gc", power = 2
+  set.seed(11); b <- sort(sample.int(N, 50, prob = (g$gc / mean(g$gc))^2))
+  expect_identical(a, b)
+  set.seed(12); a <- random_list(g, 50, biased = TRUE, by = "gc", power = -5)
+  set.seed(12); b <- sort(sample.int(N, 50, prob = (g$gc / mean(g$gc))^-5))
+  expect_identical(a, b)
+  set.seed(13); a <- random_list(g, 50, biased = TRUE, by = "total_sites_noext", power = 10)
+  set.seed(13); b <- sort(sample.int(N, 50, prob = (d / mean(d))^10))
+  expect_identical(a, b)
+  set.seed(14); a <- random_list(g, 50)                          # uniforme
+  set.seed(14); b <- sort(sample.int(N, 50))
+  expect_identical(a, b)
+})
+
+test_that("random_list: power vale 2 di default", {
+  expect_equal(formals(random_list)$power, 2)
+})
+
+# Verso il basso. Atteso, dichiarato prima di eseguire (specchio dei test verso l'alto):
+# con power = -2 il GC medio della lista scende di piu' di 0.03 rispetto all'uniforme;
+# per total_sites_noext la densita' media scende.
+test_that("random_list biased power < 0: GC medio piu' basso dell'uniforme", {
+  toy <- make_toy(N = 2000)
+  set.seed(15)
+  m_u <- mean(replicate(20, mean(toy$genes$gc[random_list(toy$genes, 300)])))
+  m_b <- mean(replicate(20, mean(toy$genes$gc[random_list(toy$genes, 300, biased = TRUE,
+                                                          power = -2)])))
+  expect_lt(m_b, m_u - 0.03)
+})
+
+test_that("random_list biased power < 0 by total_sites_noext: densita' media piu' bassa", {
+  toy <- make_toy(N = 2000)
+  d <- toy$genes$total_sites_noext
+  set.seed(16)
+  m_u <- mean(replicate(20, mean(d[random_list(toy$genes, 300)])))
+  m_b <- mean(replicate(20, mean(d[random_list(toy$genes, 300, biased = TRUE,
+                                              by = "total_sites_noext", power = -2)])))
+  expect_lt(m_b, m_u)
+})
+
+test_that("random_list power > 0: un gene con valore 0 non ha peso 0 (n = N funziona)", {
+  toy <- make_toy(N = 500)
+  toy$genes$total_sites_noext[1] <- 0L           # con peso 0, sample.int(500, 500) fallirebbe
+  x <- random_list(toy$genes, 500, biased = TRUE, by = "total_sites_noext", power = 10)
+  expect_identical(x, 1:500)
+})
+
+test_that("random_list: n = 1 e n = N sono validi", {
+  toy <- make_toy(N = 500)
+  expect_length(random_list(toy$genes, 1), 1)
+  expect_identical(random_list(toy$genes, 500), 1:500)
+})
+
+# Messaggi attesi: "`n` deve essere un intero tra 1 e 500"
+#                  "`by` deve essere \"gc\" o \"total_sites_noext\""  (nome esatto, niente
+#                  corrispondenza parziale: "total_sites" e' una colonna ma NON e' valida)
+test_that("random_list: n fuori range o non valido e' un errore con messaggio chiaro", {
+  toy <- make_toy(N = 500)
+  for (bad in list(0, -3, 501, 2.5, NA_real_, c(5, 10)))
+    expect_error(random_list(toy$genes, bad), "n. deve essere un intero tra 1 e 500",
+                 info = paste(deparse(bad), collapse = ""))
+})
+
+test_that("random_list: by non valido e' un errore con messaggio chiaro", {
+  toy <- make_toy(N = 500)
+  for (bad in list("total_sites", "GC", "foo", NA_character_, 1))
+    expect_error(random_list(toy$genes, 50, biased = TRUE, by = bad),
+                 "by. deve essere.*gc.*total_sites_noext", info = paste(deparse(bad), collapse = ""))
+})
+
+# Messaggio atteso: "`power` deve essere un numero singolo finito"
+test_that("random_list: power non valido e' un errore con messaggio chiaro", {
+  toy <- make_toy(N = 500)
+  for (bad in list(NA_real_, "2", Inf, c(1, 2)))
+    expect_error(random_list(toy$genes, 50, biased = TRUE, power = bad),
+                 "power. deve essere un numero singolo finito", info = paste(deparse(bad), collapse = ""))
 })

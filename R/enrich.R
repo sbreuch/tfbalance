@@ -182,3 +182,38 @@ enrich_corrected <- function(idx, hits, genes, min_expected = 10) {
              expected = E, z = z, p = p, fdr = p.adjust(p, "BH"),
              stringsAsFactors = FALSE)
 }
+
+# ---------------------------------------------------------------------------
+# random_list: lista dimostrativa di n geni (indici di riga di `genes`, ordinati).
+#
+# biased = FALSE: n geni a caso con la stessa probabilita'.
+# biased = TRUE: ogni gene ha un peso (valore / media)^power, dove "valore" e' la
+# colonna `by` ("gc" o "total_sites_noext"); si pesca senza reinserimento con
+# sample.int(prob = peso). power > 0 favorisce i valori alti, power < 0 i bassi,
+# power = 0 equivale all'uniforme. E' la stessa regola della griglia del Passo 4
+# (data-raw/validation/step4_bias_calibration.R): a parita' di seed e argomenti
+# il risultato coincide con sort(sample.int(N, n, prob = (x / mean(x))^power)).
+# Un valore <= 0 nella colonna vale come il minimo valore positivo, per evitare
+# pesi infiniti (power < 0) o nulli (power > 0). Nei dati reali non capita
+# (minimo di total_sites_noext = 239, di gc = 0.09).
+#
+# Il default power = 2 e' una scelta dimostrativa, NON l'esito della regola di
+# calibrazione del Passo 4, che non ha dato un default (il controllo uniforme non
+# risultava tarato). Con power = 2 su gc la lista si sposta di circa +0.38 DS in
+# GC: il baseline si gonfia (frazione di motivi con p < 0.05 = 0.151) e il test
+# corretto resta vicino al nominale (0.057).
+random_list <- function(genes, n, biased = FALSE, by = "gc", power = 2) {
+  N <- nrow(genes)
+  if (!is.numeric(n) || length(n) != 1 || is.na(n) || n != round(n) || n < 1 || n > N)
+    stop("`n` deve essere un intero tra 1 e ", N, call. = FALSE)
+  if (!is.character(by) || length(by) != 1 || !(by %in% c("gc", "total_sites_noext")))
+    stop("`by` deve essere \"gc\" o \"total_sites_noext\"", call. = FALSE)
+  if (!is.numeric(power) || length(power) != 1 || !is.finite(power))
+    stop("`power` deve essere un numero singolo finito", call. = FALSE)
+
+  if (!biased) return(sort(sample.int(N, n)))
+
+  x <- genes[[by]]
+  x[x <= 0] <- min(x[x > 0])             # valore <= 0 vale come il minimo positivo
+  sort(sample.int(N, n, prob = (x / mean(x))^power))
+}
