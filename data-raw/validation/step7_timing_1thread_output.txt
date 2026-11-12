@@ -1,0 +1,13 @@
+R 4.6.2 | BLAS: FlexiBLAS OPENBLAS-OPENMP | OPENBLAS_NUM_THREADS = 1 
+
+             filtro    n motivi baseline_s corretto_s totale_s totale_min_max z_non_NA avvisi
+      default (852)   10    852      0.055      0.575    0.628      0.62-0.86        0      0
+      default (852)   50    852      0.068      0.594    0.662      0.63-0.75      488      0
+      default (852)  300    852      0.068      0.603    0.671      0.63-0.68      728      0
+      default (852) 5000    852      0.068      0.477    0.538      0.53-0.56      852      0
+ disattivato (1019)   10   1019      0.070      0.644    0.714      0.70-0.72        0      0
+ disattivato (1019)   50   1019      0.071      0.612    0.684      0.67-0.69      594      0
+ disattivato (1019)  300   1019      0.073      0.591    0.664      0.66-0.67      834      0
+ disattivato (1019) 5000   1019      0.073      0.578    0.651      0.63-0.70      989      0
+
+z_non_NA = motivi con z non NA nel corretto con min_expected = 10 (default); avvisi = totale su 3 ripetizioni
