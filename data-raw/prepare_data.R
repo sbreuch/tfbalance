@@ -1,6 +1,32 @@
 # prepare_data.R -- da eseguire UNA volta sola, fuori dall'app.
-# Produce data/genes.rds e data/motif_hits.rds (vedi i passi sotto).
+# Produce data/genes.rds e data/motif_hits.rds.
 # Genome build: hg38 = GRCh38 (TxDb.Hsapiens.UCSC.hg38.knownGene).
+#
+# SEZIONI
+#   Passo 1   geni umani (genes()) su chr1-22, X, Y
+#   Passo 2   un promotore per gene: 1000 bp a monte, 100 a valle del TSS
+#   Passo 3   sequenze (getSeq), contenuto in GC, esclusione dei promotori con N
+#   Passo 4   simboli ed Ensembl ID da org.Hs.eg.db
+#   Passo 5a  lettura delle matrici JASPAR (pfm) dal file txt
+#   Passo 5b  riscalamento delle colonne a somma uguale; rescaled e rel_diff
+#   Passo 6a  PWM e verifica della soglia min.score = "90%"
+#   Passo 6b  test sintetico dei due filamenti e dei palindromi
+#   Passo 6c  promotori di seguito, assegnazione dei siti ai geni, scarto dei confini
+#   Passo 7   prova di tempo su 10 motivi (non salva nulla)
+#   Passo 8a  scansione di tutti i motivi (~16 min), risultato grezzo in /tmp, riassunti
+#   Passo 8b  costruzione e salvataggio di genes.rds e motif_hits.rds in data/
+#
+# COME ESEGUIRLO (dalla radice del progetto, un solo processo R alla volta)
+#   Rscript data-raw/prepare_data.R              # prima volta: circa 20 minuti
+# Variabili d'ambiente opzionali:
+#   TFBALANCE_REUSE=1        rilegge il risultato grezzo invece di scansionare (pochi minuti)
+#   TFBALANCE_SCAN_FILE=...  dove sta il risultato grezzo (default /tmp/tfbalance_scan.rds)
+#   TFBALANCE_OUT_DIR=...    cartella di uscita (default data)
+#   TFBALANCE_TRIAL_ONLY=1   si ferma dopo la prova su 20 motivi, senza salvare nulla
+# Esempio: TFBALANCE_REUSE=1 Rscript data-raw/prepare_data.R
+#
+# FILE JASPAR: non e' nel repository; va messo in data-raw/ con questo nome:
+#   data-raw/JASPAR2026_CORE_vertebrates_non-redundant_pfms_jaspar.txt
 
 suppressPackageStartupMessages({
   library(GenomicFeatures)
