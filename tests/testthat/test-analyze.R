@@ -98,9 +98,9 @@ test_that("senza token non riconosciuti not_found e' character(0)", {
 
 test_that("nessun token riconosciuto: errore italiano chiaro", {
   toy <- make_toy()
-  expect_error(analyze_list("FOO BAR", toy$genes, toy$hits), "nessun gene riconosciuto")
-  expect_error(analyze_list("", toy$genes, toy$hits), "nessun gene riconosciuto")
-  expect_error(analyze_list("  ,; \n ", toy$genes, toy$hits), "nessun gene riconosciuto")
+  expect_error(analyze_list("FOO BAR", toy$genes, toy$hits), "No gene recognised")
+  expect_error(analyze_list("", toy$genes, toy$hits), "No gene recognised")
+  expect_error(analyze_list("  ,; \n ", toy$genes, toy$hits), "No gene recognised")
 })
 
 # === duplicati dopo la mappatura ============================================
@@ -174,7 +174,7 @@ test_that("fino a MAX_LIST geni riconosciuti va bene; non contano ne' i non rico
 test_that("oltre MAX_LIST geni riconosciuti: errore chiaro che cita il limite", {
   toy <- make_toy(N = 6000, K = c(40, 40, 40))
   expect_error(analyze_list(sym_text(seq_len(MAX_LIST + 1)), toy$genes, toy$hits),
-               "5000|5\\.000")
+               "maximum is 5000")
 })
 
 test_that("MAX_TOKENS e' 50000", {
@@ -192,14 +192,14 @@ test_that("fino a MAX_TOKENS token grezzi va bene (anche con molte ripetizioni)"
 test_that("oltre MAX_TOKENS token grezzi: errore chiaro che cita il limite, PRIMA di map_ids", {
   toy <- make_toy()
   txt <- paste(rep("G1", MAX_TOKENS + 1), collapse = " ")
-  expect_error(analyze_list(txt, toy$genes, toy$hits), "50000|50\\.000")
+  expect_error(analyze_list(txt, toy$genes, toy$hits), "maximum is 50000")
   # map_ids sostituita da una funzione che fallisce con un altro messaggio: se venisse
   # chiamata prima del controllo, "50000" non comparirebbe nell'errore
   env <- environment(analyze_list)
   orig <- get("map_ids", envir = env)
   assign("map_ids", function(...) stop("map_ids chiamata"), envir = env)
   on.exit(assign("map_ids", orig, envir = env), add = TRUE)
-  expect_error(analyze_list(txt, toy$genes, toy$hits), "50000|50\\.000")
+  expect_error(analyze_list(txt, toy$genes, toy$hits), "maximum is 50000")
 })
 
 # === risultato ==============================================================
@@ -280,7 +280,7 @@ test_that("il filtro esclude tutti i motivi: errore italiano che nasce in analyz
   toy <- make_toy()
   # frazioni dei motivi: 0, .05, .1, .15, .2, .3, .5, .95; nessuna in [0.6, 0.9]
   expect_error(analyze_list(sym_text(1:60), toy$genes, toy$hits, frac_range = c(0.6, 0.9)),
-               "filtro")
+               "excludes all motifs")
   # l'errore deve venire PRIMA di enrich_baseline: la sostituisco con una funzione che
   # fallisce con un altro messaggio (se fosse chiamata, "filtro" non comparirebbe)
   env <- environment(analyze_list)
@@ -288,7 +288,7 @@ test_that("il filtro esclude tutti i motivi: errore italiano che nasce in analyz
   assign("enrich_baseline", function(...) stop("enrich_baseline chiamata"), envir = env)
   on.exit(assign("enrich_baseline", orig, envir = env), add = TRUE)
   expect_error(analyze_list(sym_text(1:60), toy$genes, toy$hits, frac_range = c(0.6, 0.9)),
-               "filtro")
+               "excludes all motifs")
 })
 
 test_that("frac_range e min_expected non validi: l'errore di enrich.R arriva all'utente", {
@@ -326,7 +326,7 @@ test_that("nessun motivo con E >= min_expected: n_corrected = 0 e corrected_note
   expect_false(is.unsorted(r$table$p_baseline))             # ordine = p_baseline
   expect_type(r$corrected_note, "character")
   expect_length(r$corrected_note, 1)
-  expect_match(r$corrected_note, "nessun motivo")
+  expect_match(r$corrected_note, "no motif has E")
   # la nota cita la soglia usata
   r12 <- analyze_list(sym_text(1:10), toy$genes, toy$hits, min_expected = 12)
   expect_match(r12$corrected_note, "12")
@@ -354,8 +354,8 @@ test_that("modello non stimabile (enrich_corrected sostituita: tutti NA): la not
   expect_warning(r <- analyze_list(sym_text(1:60), toy$genes, toy$hits), "non e' stimabile")
   expect_equal(r$n_corrected, 0)
   expect_true(any(r$table$expected >= 10))     # quindi NON e' un problema di E bassa
-  expect_match(r$corrected_note, "non e' stimabile")
-  expect_false(grepl("nessun motivo", r$corrected_note))
+  expect_match(r$corrected_note, "cannot be fitted")
+  expect_false(grepl("no motif has E", r$corrected_note))
   expect_false(is.unsorted(r$table$p_baseline))   # tutti NA: ordine = p_baseline
 })
 
@@ -365,6 +365,6 @@ test_that("modello non stimabile con input reale (lista = i geni con GC piu' alt
   txt <- paste(toy$genes$symbol[top], collapse = " ")
   expect_warning(r <- analyze_list(txt, toy$genes, toy$hits), "non e' stimabile")
   expect_equal(r$n_corrected, 0)
-  expect_match(r$corrected_note, "non e' stimabile")
+  expect_match(r$corrected_note, "cannot be fitted")
   expect_false(anyNA(r$table$p_baseline))      # il baseline c'e' comunque
 })

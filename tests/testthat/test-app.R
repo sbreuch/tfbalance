@@ -144,11 +144,11 @@ test_that("(c) nessun gene riconosciuto: res()$error e riquadro rosso con il mes
   shiny::testServer(app_dir, {
     session$setInputs(genes = "FOO BAR", go = 1)
     r <- res()
-    expect_match(r$error, "nessun gene riconosciuto")
+    expect_match(r$error, "No gene recognised")
     expect_null(r$table)
     expect_match(as.character(output$summary$html), "alert-danger", fixed = TRUE)
     s <- box_text(output$summary)
-    expect_match(s, "nessun gene riconosciuto", fixed = TRUE)
+    expect_match(s, "No gene recognised", fixed = TRUE)
     expect_false(grepl("Geni riconosciuti", s))    # niente conteggi accanto all'errore
   })
 })
@@ -157,8 +157,8 @@ test_that("(c) testo vuoto: arriva ad analyze_list e l'utente vede l'errore (non
   skip_if_not(data_ok)
   shiny::testServer(app_dir, {
     session$setInputs(genes = "", go = 1)
-    expect_match(res()$error, "nessun gene riconosciuto")
-    expect_match(box_text(output$summary), "nessun gene riconosciuto", fixed = TRUE)
+    expect_match(res()$error, "No gene recognised")
+    expect_match(box_text(output$summary), "No gene recognised", fixed = TRUE)
   })
 })
 
@@ -167,8 +167,8 @@ test_that("(c) un errore sui limiti arriva com'e': piu' di MAX_TOKENS token", {
   shiny::testServer(app_dir, {
     max_tokens <- app_get("MAX_TOKENS", session)
     session$setInputs(genes = paste(rep("G1", max_tokens + 1), collapse = " "), go = 1)
-    expect_match(res()$error, "50000|50\\.000")
-    expect_match(box_text(output$summary), "50000|50\\.000")
+    expect_match(res()$error, "maximum is 50000")
+    expect_match(box_text(output$summary), "maximum is 50000")
   })
 })
 
@@ -217,10 +217,10 @@ test_that("(e) lista separabile: nessun avviso arriva al test e la nota 'non e' 
     })
     expect_equal(r$n_list, 60)
     expect_equal(r$n_corrected, 0)
-    expect_match(r$corrected_note, "non e' stimabile", fixed = TRUE)
-    expect_match(s, "non e' stimabile", fixed = TRUE)
+    expect_match(r$corrected_note, "cannot be fitted", fixed = TRUE)
+    expect_match(s, "cannot be fitted", fixed = TRUE)
     expect_match(s, "Test corretto disponibile per 0 di", fixed = TRUE)
-    expect_false(grepl("nessun motivo", s))        # non e' un problema di E bassa
+    expect_false(grepl("no motif has E", s))        # non e' un problema di E bassa
   })
 })
 
@@ -310,7 +310,7 @@ test_that("(g2) con corrected_note la didascalia non afferma 'atteso < N'", {
     expect_false(grepl("atteso <", s, fixed = TRUE))
 
     session$setInputs(genes = paste(top_gc_symbols(60), collapse = " "), go = 2)
-    expect_match(res()$corrected_note, "non e' stimabile", fixed = TRUE)
+    expect_match(res()$corrected_note, "cannot be fitted", fixed = TRUE)
     expect_true(any(res()$table$expected >= formals(app_get("analyze_list", session))$min_expected))
     s <- box_text(output$caption)
     expect_match(s, "NA nel test corretto", fixed = TRUE)

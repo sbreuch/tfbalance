@@ -33,18 +33,18 @@ analyze_list <- function(text, genes, hits, frac_range = c(0.005, 0.9), min_expe
   tokens <- tokens[nzchar(tokens)]
 
   if (length(tokens) > MAX_TOKENS)
-    stop("troppi nomi nel testo (", length(tokens), "): il massimo e' ",
-         MAX_TOKENS, " (ripetizioni incluse)", call. = FALSE)
+    stop("Too many names in the text (", length(tokens), "): the maximum is ",
+         MAX_TOKENS, " (repeats included)", call. = FALSE)
 
   # --- 2. nomi -> righe di `genes` ------------------------------------------
   m <- map_ids(tokens, genes)          # una sola chiamata: costa ~0.1 s anche con 5000 token
   idx <- unique(m$idx)                 # (map_ids li da' gia' unici: qui per sicurezza)
   if (length(idx) == 0)
-    stop("nessun gene riconosciuto: controlla che i nomi siano simboli, ID Entrez ",
-         "o ID Ensembl, separati da spazi, virgole, punti e virgola o a capo",
+    stop("No gene recognised: check that the names are symbols, Entrez IDs ",
+         "or Ensembl IDs, separated by spaces, commas, semicolons or new lines",
          call. = FALSE)
   if (length(idx) > MAX_LIST)
-    stop("la lista ha ", length(idx), " geni riconosciuti: il massimo e' ", MAX_LIST,
+    stop("The list has ", length(idx), " recognised genes: the maximum is ", MAX_LIST,
          call. = FALSE)
   N <- nrow(genes)
   check_list(idx, N)                   # errori (es. "tutti i geni") passano com'e'
@@ -61,8 +61,8 @@ analyze_list <- function(text, genes, hits, frac_range = c(0.005, 0.9), min_expe
   n_excluded_low <- sum(!select_motifs(hits, N, c(frac_range[1], 1)))
   n_excluded_high <- sum(!select_motifs(hits, N, c(0, frac_range[2])))
   if (!any(keep))
-    stop("il filtro esclude tutti i motivi: nessun motivo ha una frazione di geni con ",
-         "sito tra ", frac_range[1], " e ", frac_range[2], "; allarga l'intervallo",
+    stop("The filter excludes all motifs: no motif has a fraction of genes with a ",
+         "site between ", frac_range[1], " and ", frac_range[2], "; widen the range",
          call. = FALSE)
   hits <- hits[keep]
 
@@ -83,11 +83,11 @@ analyze_list <- function(text, genes, hits, frac_range = c(0.005, 0.9), min_expe
   corrected_note <- NULL
   if (n_corrected == 0) {
     corrected_note <- if (all(tab$expected < min_expected))
-      paste0("Test corretto non calcolato: nessun motivo ha E >= ", format(min_expected),
-             " (E = geni della lista attesi con il sito). Con liste piccole succede; ",
-             "usa il test baseline o una lista piu' grande.")
+      paste0("Corrected test not computed: no motif has E >= ", format(min_expected),
+             " (E = genes of the list expected to have the site). This happens with ",
+             "small lists; use the baseline test or a larger list.")
     else
-      "Test corretto non calcolato: il modello non e' stimabile per questa lista."
+      "Corrected test not computed: the model cannot be fitted for this list."
   }
 
   list(table = tab, not_found = m$not_found, n_list = length(idx),
