@@ -1,0 +1,44 @@
+N = 35150 | motivi = 1019 | min_expected = 10 | SCORE_VAR_MIN = 1e-08 
+motivi con K = 0: 1 | K = N: 3 
+
+== riepilogo (conteggi su tutte le liste del caso) ==
+  filtro          caso liste coppie_E_ok NA_con_E_ok liste_con_NA modello K0_KN guardia altro avvisi
+ default          n=12    20         860           0            0       0     0       0     0      0
+ default          n=20    20        4520           0            0       0     0       0     0      0
+ default          n=50    20        9760           0            0       0     0       0     0      0
+ default         n=300    20       14560           0            0       0     0       0     0      0
+ default        n=5000    20       17040           0            0       0     0       0     0      0
+  c(0,1)          n=12    20        3040          60           20       0    60       0     0      0
+  c(0,1)          n=20    20        6700          60           20       0    60       0     0      0
+  c(0,1)          n=50    20       11940          60           20       0    60       0     0      0
+  c(0,1)         n=300    20       16740          60           20       0    60       0     0      0
+  c(0,1)        n=5000    20       19840          60           20       0    60       0     0      0
+  c(0,1) Passo7 n=5000     1         992           3            1       0     3       0     0      0
+
+coppie_E_ok = coppie (lista, motivo) con E >= min_expected; NA_con_E_ok = di queste, quelle con z NA;
+liste_con_NA = liste (su 20) con almeno un NA con E >= min_expected; ultime colonne = causa.
+
+== NA con E >= min_expected: dettaglio per (filtro, caso, motivo), motivi ripetuti raggruppati ==
+                                            chiave volte E_min E_max     v_rel_min     v_rel_max
+          c(0,1) | n=12 | MA0498.3 | 35150 | K0_KN    20    12    12 -5.923611e-16  7.405001e-16
+          c(0,1) | n=12 | MA0625.3 | 35150 | K0_KN    20    12    12 -5.923611e-16  7.405001e-16
+          c(0,1) | n=12 | MA1536.2 | 35150 | K0_KN    20    12    12 -5.923611e-16  7.405001e-16
+          c(0,1) | n=20 | MA0498.3 | 35150 | K0_KN    20    20    20 -3.554758e-16  7.109914e-16
+          c(0,1) | n=20 | MA0625.3 | 35150 | K0_KN    20    20    20 -3.554758e-16  7.109914e-16
+          c(0,1) | n=20 | MA1536.2 | 35150 | K0_KN    20    20    20 -3.554758e-16  7.109914e-16
+         c(0,1) | n=300 | MA0498.3 | 35150 | K0_KN    20   300   300 -9.555527e-16  3.823183e-16
+         c(0,1) | n=300 | MA0625.3 | 35150 | K0_KN    20   300   300 -9.555527e-16  3.823183e-16
+         c(0,1) | n=300 | MA1536.2 | 35150 | K0_KN    20   300   300 -9.555527e-16  3.823183e-16
+          c(0,1) | n=50 | MA0498.3 | 35150 | K0_KN    20    50    50 -4.270161e-16  8.539124e-16
+          c(0,1) | n=50 | MA0625.3 | 35150 | K0_KN    20    50    50 -4.270161e-16  8.539124e-16
+          c(0,1) | n=50 | MA1536.2 | 35150 | K0_KN    20    50    50 -4.270161e-16  8.539124e-16
+        c(0,1) | n=5000 | MA0498.3 | 35150 | K0_KN    20  5000  5000 -6.362496e-16  8.482809e-16
+        c(0,1) | n=5000 | MA0625.3 | 35150 | K0_KN    20  5000  5000 -6.362496e-16  8.482809e-16
+        c(0,1) | n=5000 | MA1536.2 | 35150 | K0_KN    20  5000  5000 -6.362496e-16  8.482809e-16
+ c(0,1) | Passo7 n=5000 | MA0498.3 | 35150 | K0_KN     1  5000  5000 -4.242119e-16 -4.242119e-16
+ c(0,1) | Passo7 n=5000 | MA0625.3 | 35150 | K0_KN     1  5000  5000 -4.242119e-16 -4.242119e-16
+ c(0,1) | Passo7 n=5000 | MA1536.2 | 35150 | K0_KN     1  5000  5000 -4.242119e-16 -4.242119e-16
+
+motivi diversi con NA e E >= min_expected: 3 su 1019 
+
+tempo: 4.6 minuti
