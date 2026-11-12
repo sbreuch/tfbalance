@@ -75,6 +75,10 @@ server <- function(input, output, session) {
     if (!is.null(r$error))
       return(div(class = "alert alert-danger", r$error))
 
+    # Conteggi dei motivi con FDR < 0.05 (R/compare.R). B e C sono NA se nessun motivo ha il
+    # test corretto: si scrive "not available", non 0.
+    cnt <- fdr_counts(r$table)
+    show <- function(x) if (is.na(x)) "not available" else x
     tagList(
       tags$ul(
         tags$li(paste0("Recognised genes: ", r$n_list)),
@@ -84,6 +88,13 @@ server <- function(input, output, session) {
                        " below the minimum, ", r$n_excluded_high, " above the maximum)")),
         tags$li(paste0("Corrected test available for ", r$n_corrected, " of ",
                        r$n_motifs, " motifs"))
+      ),
+      p("Motifs with FDR < 0.05"),
+      tags$ul(
+        tags$li(paste0("baseline, all ", cnt$n_all, " motifs: ", cnt$base_all)),
+        tags$li(paste0("baseline, same ", cnt$n_sub, " motifs as the corrected test: ",
+                       show(cnt$base_sub))),
+        tags$li(paste0("corrected test: ", show(cnt$corrected)))
       ),
       if (!is.null(r$corrected_note))     # la nota c'e' solo se nessun motivo ha il test corretto
         div(class = "alert alert-warning", r$corrected_note)

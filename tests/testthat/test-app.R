@@ -454,3 +454,65 @@ test_that("(L5) il messaggio di avanzamento e' 'Analysing...'", {
     expect_identical(seen, "Analysing...")
   })
 })
+
+# === B3b: conteggi FDR nel riquadro e grafico di confronto ====================
+# Interfaccia aggiunta: nel riquadro tre conteggi di motivi con FDR < 0.05 (A, B, C).
+
+# simboli dei geni con il sito del motivo con K piu' vicino a k_target (n a caso, o tutti se n e' NULL).
+# Il seme e' locale (withr::with_seed): il seme globale non cambia.
+motif_symbols <- function(k_target, n = NULL, seed = 3) {
+  g <- readRDS(file.path(app_dir, "data", "genes.rds"))
+  h <- readRDS(file.path(app_dir, "data", "motif_hits.rds"))
+  idx <- h[[which.min(abs(unname(lengths(lapply(h, `[[`, "genes"))) - k_target))]]$genes
+  if (!is.null(n)) idx <- withr::with_seed(seed, sample(idx, n))
+  s <- toupper(g$symbol)
+  ok <- !is.na(s) & s != "" & !duplicated(s) & !duplicated(s, fromLast = TRUE)
+  g$symbol[idx[ok[idx]]]
+}
+
+# conteggi attesi con p.adjust, indipendenti da R/compare.R: A = baseline su tutti i motivi,
+# B = baseline ricalcolato sui soli motivi con z, C = corretto
+fdr_oracle <- function(t) {
+  has <- !is.na(t$z)
+  c(a = sum(t$fdr_baseline < 0.05),
+    b = sum(p.adjust(ifelse(has, t$p_baseline, NA), "BH") < 0.05, na.rm = TRUE),
+    c = sum(t$fdr_corrected < 0.05, na.rm = TRUE))
+}
+
+test_that("(6) riquadro: tre conteggi con FDR < 0.05, uguali a un ricalcolo indipendente", {
+  skip_if_not(data_ok)
+  shiny::testServer(app_dir, {
+    # M e n si ricalcolano dalla tabella (non da analyze_list); B e C si controllano insieme perche'
+    # "corrected test: C" e' anche la fine della riga B
+    lines_for <- function(t) {
+      o <- fdr_oracle(t)
+      c(sprintf("baseline, all %d motifs: %d", nrow(t), o[["a"]]),
+        sprintf("baseline, same %d motifs as the corrected test: %d corrected test: %d",
+                sum(!is.na(t$z)), o[["b"]], o[["c"]]))
+    }
+    session$setInputs(genes = paste(real_symbols(60), collapse = " "), go = 1)          # lista normale
+    t <- res()$table; s <- box_text(output$summary)
+    expect_match(s, "Motifs with FDR < 0.05", fixed = TRUE)
+    expect_identical(unname(fdr_oracle(t)), c(0L, 0L, 0L))
+    for (l in lines_for(t)) expect_match(s, l, fixed = TRUE)
+
+    session$setInputs(genes = paste(motif_symbols(3000, 300), collapse = " "), go = 2)   # lista arricchita
+    t <- res()$table; o <- fdr_oracle(t); s <- box_text(output$summary)
+    expect_gt(o[["a"]], 0)
+    expect_false(o[["a"]] == o[["b"]])       # stessi p, famiglie diverse: i due baseline differiscono
+    for (l in lines_for(t)) expect_match(s, l, fixed = TRUE)
+  })
+})
+
+test_that("(7) senza motivi con test corretto: A mostrato, B e C 'not available'", {
+  skip_if_not(data_ok)
+  shiny::testServer(app_dir, {
+    session$setInputs(genes = paste(real_symbols(10), collapse = " "), go = 1)
+    t <- res()$table; s <- box_text(output$summary)
+    n <- sum(!is.na(t$z))
+    expect_equal(n, 0)
+    expect_match(s, sprintf("baseline, all %d motifs: %d", nrow(t), sum(t$fdr_baseline < 0.05)), fixed = TRUE)
+    expect_match(s, sprintf("baseline, same %d motifs as the corrected test: not available corrected test: not available", n),
+                 fixed = TRUE)
+  })
+})
