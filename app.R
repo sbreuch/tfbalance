@@ -9,6 +9,7 @@
 
 library(shiny)
 library(bslib)
+library(DT)                               # tabelle interattive (DTOutput / renderDT)
 
 # --- 1. Dati ------------------------------------------------------------------
 # Fuori da server(): vengono letti una volta sola quando parte l'app e condivisi
@@ -17,8 +18,7 @@ genes <- readRDS("data/genes.rds")        # una riga per gene
 hits <- readRDS("data/motif_hits.rds")    # una voce per motivo, con i geni che hanno il sito
 
 # --- 2. UI --------------------------------------------------------------------
-# page_navbar() fa una pagina con una barra in alto e una scheda (nav_panel) per
-# voce. Per ora c'e' solo "Analisi"; le altre arrivano nel passo successivo.
+# page_navbar() fa una pagina con una barra in alto e una scheda (nav_panel) per voce.
 ui <- page_navbar(
   title = "tfbalance",
   id = "tabs",
@@ -36,9 +36,16 @@ ui <- page_navbar(
       card(
         card_header("Risultato"),
         uiOutput("summary")               # qui il server scrive il riquadro dei conteggi
+      ),
+      card(
+        card_header("Motivi"),
+        uiOutput("caption"),              # didascalia sopra la tabella
+        DTOutput("tbl")                   # la tabella (DT = DataTables)
       )
     )
-  )
+  ),
+  nav_panel("Geni non riconosciuti", uiOutput("notfound")),
+  nav_panel("Come funziona", p("(testo da scrivere)"))     # segnaposto
 )
 
 # --- 3. Server ----------------------------------------------------------------
@@ -80,6 +87,59 @@ server <- function(input, output, session) {
       ),
       if (!is.null(r$corrected_note))     # la nota c'e' solo se nessun motivo ha il test corretto
         div(class = "alert alert-warning", r$corrected_note)
+    )
+  })
+
+  # Didascalia: spiega gli NA, ma solo con frasi VERE. "NA = atteso < soglia" vale per le
+  # liste normali; gli NA possono pero' nascere anche da altre cause (modello non
+  # stimabile, motivo presente in tutti i geni, ...). Quindi la frase precisa si usa solo se
+  # controllando la tabella e' vera: nessuna nota e nessun NA con atteso >= soglia.
+  # La soglia non e' scritta a mano: la leggo dal valore di default di min_expected nella
+  # firma di analyze_list (che l'app non cambia), cosi' se quel default cambia, cambia
+  # anche il testo.
+  output$caption <- renderUI({
+    r <- res()
+    req(is.null(r$error))                 # con un errore non c'e' tabella: niente didascalia
+    soglia <- formals(analyze_list)$min_expected
+    na_con_atteso_alto <- any(is.na(r$table$z) & r$table$expected >= soglia)
+    testo <- if (is.null(r$corrected_note) && !na_con_atteso_alto)
+      paste0("NA nel test corretto = atteso < ", format(soglia), " geni: test non affidabile.")
+    else
+      paste0("NA nel test corretto = test non calcolato (la causa e' nella nota sopra; ",
+             "senza nota, il motivo non e' analizzabile, per esempio e' presente in tutti i geni).")
+    p(class = "text-muted small", testo)
+  })
+
+  # La tabella. Il risultato di analyze_list e' gia' ordinato: order = list() dice a DT di
+  # NON riordinarlo. (DT 0.34.0 lo fa gia' da solo se manca; lo scrivo lo stesso perche'
+  # l'ordine e' una scelta dell'app e non deve dipendere dal default di DT.)
+  # formatSignif/formatRound cambiano solo come si VEDONO i numeri (3 cifre
+  # significative per p e FDR, 2 decimali per atteso e z): l'ordinamento resta numerico.
+  output$tbl <- renderDT({
+    r <- res()
+    req(is.null(r$error))
+    datatable(
+      r$table,
+      rownames = FALSE,                   # niente colonna con i numeri di riga
+      colnames = c("Motivo", "TF", "k", "K", "Attesi (E)", "p baseline", "FDR baseline",
+                   "z", "p corretto", "FDR corretto"),
+      options = list(order = list(), pageLength = 25)
+    ) |>
+      formatSignif(c("p_baseline", "fdr_baseline", "p_corrected", "fdr_corrected"), 3) |>
+      formatRound(c("expected", "z"), 2)
+  })
+
+  # Scheda "Geni non riconosciuti": il numero e l'elenco, un nome per riga.
+  # tags$pre mostra il testo cosi' com'e' (anche un nome con "<" non viene letto come HTML).
+  output$notfound <- renderUI({
+    r <- res()
+    if (!is.null(r$error))
+      return(p("Nessuna analisi disponibile: guarda l'errore nella scheda Analisi."))
+    if (length(r$not_found) == 0)
+      return(p("Nessun token non riconosciuto."))
+    tagList(
+      p(paste0("Token non riconosciuti: ", length(r$not_found))),
+      tags$pre(paste(r$not_found, collapse = "\n"))
     )
   })
 }
