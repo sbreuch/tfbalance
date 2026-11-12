@@ -24,28 +24,28 @@ ui <- page_navbar(
   id = "tabs",
   fillable = FALSE,                       # la pagina scorre normalmente
   nav_panel(
-    "Analisi",
+    "Analysis",
     layout_sidebar(                       # colonna a sinistra + contenuto a destra
       sidebar = sidebar(
-        textAreaInput("genes", "Lista di geni", rows = 10,
-                      placeholder = "Un gene per riga, o separati da spazi o virgole"),
-        helpText("Simboli, ID Entrez o ID Ensembl. Massimo ", MAX_LIST,
-                 " geni riconosciuti."),
-        actionButton("go", "Analizza", class = "btn-primary")
+        textAreaInput("genes", "Gene list", rows = 10,
+                      placeholder = "One gene per line, or separated by spaces or commas"),
+        helpText("Symbols, Entrez IDs or Ensembl IDs. At most ", MAX_LIST,
+                 " recognised genes."),
+        actionButton("go", "Analyse", class = "btn-primary")
       ),
       card(
-        card_header("Risultato"),
+        card_header("Results"),
         uiOutput("summary")               # qui il server scrive il riquadro dei conteggi
       ),
       card(
-        card_header("Motivi"),
+        card_header("Motifs"),
         uiOutput("caption"),              # didascalia sopra la tabella
         DTOutput("tbl")                   # la tabella (DT = DataTables)
       )
     )
   ),
-  nav_panel("Geni non riconosciuti", uiOutput("notfound")),
-  nav_panel("Come funziona", p("(testo da scrivere)"))     # segnaposto
+  nav_panel("Unrecognised genes", uiOutput("notfound")),
+  nav_panel("How it works", p("(text to be written)"))     # segnaposto
 )
 
 # --- 3. Server ----------------------------------------------------------------
@@ -57,7 +57,7 @@ server <- function(input, output, session) {
   # testo non lo rilancia, e prima del primo click non parte.
   res <- reactive({
     req(!is.null(input$genes))            # se il testo non esiste ancora, aspetta
-    withProgress(message = "Analisi in corso...", {   # messaggio mentre calcola
+    withProgress(message = "Analysing...", {   # messaggio mentre calcola
       tryCatch(
         # suppressWarnings: l'avviso "modello non stimabile" non serve, c'e' gia'
         # la nota corrected_note nel risultato.
@@ -134,11 +134,11 @@ server <- function(input, output, session) {
   output$notfound <- renderUI({
     r <- res()
     if (!is.null(r$error))
-      return(p("Nessuna analisi disponibile: guarda l'errore nella scheda Analisi."))
+      return(p("No analysis available: see the error in the Analysis tab."))
     if (length(r$not_found) == 0)
-      return(p("Nessun token non riconosciuto."))
+      return(p("No unrecognised tokens."))
     tagList(
-      p(paste0("Token non riconosciuti: ", length(r$not_found))),
+      p(paste0("Unrecognised tokens: ", length(r$not_found))),
       tags$pre(paste(r$not_found, collapse = "\n"))
     )
   })

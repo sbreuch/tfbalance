@@ -380,7 +380,7 @@ test_that("(h) tab Geni non riconosciuti: numero e un token per riga (testo del 
     r <- res()
     expect_identical(r$not_found, c("FOOBAR", "BAZ", "<b>X</b>"))
     html <- as.character(output$notfound$html)
-    expect_match(box_text(output$notfound), "Token non riconosciuti: 3", fixed = TRUE)
+    expect_match(box_text(output$notfound), "Unrecognised tokens: 3", fixed = TRUE)
     # elenco dentro <pre>: un token per riga, nell'ordine di not_found
     pre <- regmatches(html, regexec("(?s)<pre[^>]*>(.*?)</pre>", html, perl = TRUE))[[1]][2]
     expect_identical(strsplit(unescape_html(pre), "\n")[[1]], r$not_found)
@@ -394,7 +394,7 @@ test_that("(h) tab Geni non riconosciuti: se non ce ne sono, un messaggio (nient
   shiny::testServer(app_dir, {
     session$setInputs(genes = paste(real_symbols(60), collapse = " "), go = 1)
     expect_length(res()$not_found, 0)
-    expect_match(box_text(output$notfound), "Nessun token non riconosciuto", fixed = TRUE)
+    expect_match(box_text(output$notfound), "No unrecognised tokens", fixed = TRUE)
     expect_false(grepl("<pre", as.character(output$notfound$html), fixed = TRUE))
   })
 })
@@ -403,7 +403,7 @@ test_that("(h) tab Geni non riconosciuti: se l'analisi da' errore, lo dice (non 
   skip_if_not(data_ok)
   shiny::testServer(app_dir, {
     session$setInputs(genes = "FOO BAR", go = 1)
-    expect_match(box_text(output$notfound), "Nessuna analisi disponibile", fixed = TRUE)
+    expect_match(box_text(output$notfound), "No analysis available", fixed = TRUE)
   })
 })
 
@@ -412,7 +412,38 @@ test_that("(h) i tre tab ci sono, nell'ordine, e 'Come funziona' e' solo un segn
   shiny::testServer(app_dir, {
     html <- htmltools::renderTags(app_get("ui", session))$html
     tabs <- unique(gsub('data-value="|"', "", regmatches(html, gregexpr('data-value="[^"]+"', html))[[1]]))
-    expect_identical(tabs, c("Analisi", "Geni non riconosciuti", "Come funziona"))
-    expect_match(html, "(testo da scrivere)", fixed = TRUE)
+    expect_identical(tabs, c("Analysis", "Unrecognised genes", "How it works"))
+    expect_match(html, "(text to be written)", fixed = TRUE)
+  })
+})
+
+# === L5: testi dell'interfaccia in inglese ====================================
+test_that("(L5) UI: etichetta, segnaposto, aiuto, bottone e intestazioni delle card", {
+  skip_if_not(data_ok)
+  shiny::testServer(app_dir, {
+    html <- htmltools::renderTags(app_get("ui", session))$html
+    txt <- box_text(list(html = html))
+    expect_match(txt, "Gene list", fixed = TRUE)
+    expect_match(html, 'placeholder="One gene per line, or separated by spaces or commas"', fixed = TRUE)
+    expect_match(txt, sprintf("Symbols, Entrez IDs or Ensembl IDs. At most %d recognised genes.",
+                              app_get("MAX_LIST", session)), fixed = TRUE)
+    expect_match(html, 'id="go"[^>]*><span class="action-label">Analyse</span>')   # il testo e' in uno span
+    m <- gregexpr('<div class="card-header[^>]*>[^<]*', html)[[1]]
+    expect_identical(trimws(sub("<[^>]*>", "", regmatches(html, list(m))[[1]])), c("Results", "Motifs"))
+  })
+})
+
+test_that("(L5) il messaggio di avanzamento e' 'Analysing...'", {
+  skip_if_not(data_ok)
+  shiny::testServer(app_dir, {
+    # in testServer il progresso non fa nulla: sostituisco withProgress con una funzione che
+    # registra il messaggio (e poi esegue il codice); on.exit la toglie
+    env <- environment(app_get("analyze_list", session))
+    seen <- NULL
+    assign("withProgress", function(expr, message = NULL, ...) { seen <<- message; expr }, envir = env)
+    on.exit(rm("withProgress", envir = env), add = TRUE)
+    session$setInputs(genes = paste(real_symbols(60), collapse = " "), go = 1)
+    expect_equal(res()$n_list, 60)
+    expect_identical(seen, "Analysing...")
   })
 })
