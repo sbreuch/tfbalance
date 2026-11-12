@@ -10,6 +10,7 @@
 library(shiny)
 library(bslib)
 library(DT)                               # tabelle interattive (DTOutput / renderDT)
+library(ggplot2)                          # il grafico di confronto (compare_plot, in R/compare.R)
 
 # --- 1. Dati ------------------------------------------------------------------
 # Fuori da server(): vengono letti una volta sola quando parte l'app e condivisi
@@ -36,6 +37,11 @@ ui <- page_navbar(
       card(
         card_header("Results"),
         uiOutput("summary")               # qui il server scrive il riquadro dei conteggi
+      ),
+      card(
+        card_header("Comparison"),
+        plotOutput("plot"),               # grafico: baseline contro corretto, un punto per motivo
+        uiOutput("plot_note")             # riga sotto il grafico: quanti motivi sono disegnati
       ),
       card(
         card_header("Motifs"),
@@ -99,6 +105,32 @@ server <- function(input, output, session) {
       if (!is.null(r$corrected_note))     # la nota c'e' solo se nessun motivo ha il test corretto
         div(class = "alert alert-warning", r$corrected_note)
     )
+  })
+
+  # Il grafico. compare_plot (R/compare.R) disegna un punto per ogni motivo con il test corretto.
+  # - se analyze_list e' fallita: req() ferma l'output in silenzio (l'errore e' gia' nel riquadro);
+  # - se nessun motivo ha il test corretto: validate(need(...)) mostra un messaggio al posto del grafico;
+  # - alt e' il testo per chi non vede il grafico (screen reader); e' una funzione, cosi' Shiny la
+  #   rilegge a ogni analisi e il numero di motivi e' quello della tabella.
+  output$plot <- renderPlot({
+    r <- res()
+    req(is.null(r$error))
+    validate(need(any(!is.na(r$table$z)), "No motif has a corrected test: plot not available"))
+    compare_plot(r$table)
+  }, alt = function() {
+    sprintf(paste0("Scatter plot of %d motifs: -log10 p baseline (x) against -log10 p corrected (y), ",
+                   "with the diagonal y = x. A line marks FDR 0.05 for each test that has ",
+                   "significant motifs; triangles mark p = 0 (underflow)."),
+            sum(!is.na(res()$table$z)))
+  })
+
+  # Riga sotto il grafico: N = motivi con z non NA (quelli disegnati), M = motivi testati.
+  output$plot_note <- renderUI({
+    r <- res()
+    req(is.null(r$error))
+    p(class = "text-muted small",
+      sprintf("%d motifs drawn out of %d (the others have no corrected test)",
+              sum(!is.na(r$table$z)), nrow(r$table)))
   })
 
   # Didascalia: spiega gli NA, ma solo con frasi VERE. "NA = atteso < soglia" vale per le

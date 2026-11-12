@@ -425,7 +425,7 @@ test_that("(h) i tre tab ci sono, nell'ordine, e 'Come funziona' e' solo un segn
 })
 
 # === L5: testi dell'interfaccia in inglese ====================================
-test_that("(L5) UI: etichetta, segnaposto, aiuto, bottone e intestazioni delle card", {
+test_that("(L5) UI: etichetta, segnaposto, aiuto e bottone", {
   skip_if_not(data_ok)
   shiny::testServer(app_dir, {
     html <- htmltools::renderTags(app_get("ui", session))$html
@@ -435,8 +435,6 @@ test_that("(L5) UI: etichetta, segnaposto, aiuto, bottone e intestazioni delle c
     expect_match(txt, sprintf("Symbols, Entrez IDs or Ensembl IDs. At most %d recognised genes.",
                               app_get("MAX_LIST", session)), fixed = TRUE)
     expect_match(html, 'id="go"[^>]*><span class="action-label">Analyse</span>')   # il testo e' in uno span
-    m <- gregexpr('<div class="card-header[^>]*>[^<]*', html)[[1]]
-    expect_identical(trimws(sub("<[^>]*>", "", regmatches(html, list(m))[[1]])), c("Results", "Motifs"))
   })
 })
 
@@ -514,5 +512,62 @@ test_that("(7) senza motivi con test corretto: A mostrato, B e C 'not available'
     expect_match(s, sprintf("baseline, all %d motifs: %d", nrow(t), sum(t$fdr_baseline < 0.05)), fixed = TRUE)
     expect_match(s, sprintf("baseline, same %d motifs as the corrected test: not available corrected test: not available", n),
                  fixed = TRUE)
+  })
+})
+
+test_that("(8) output$plot: PNG con alt; 'plot not available' senza punti; errore silenzioso; p = 0 senza errori", {
+  skip_if_not(data_ok)
+  shiny::testServer(app_dir, {
+    is_png <- function(x) grepl("^data:image/png;base64,", x$src)
+    session$setInputs(genes = paste(real_symbols(60), collapse = " "), go = 1)           # lista normale
+    t <- res()$table
+    expect_true(is_png(output$plot))
+    expect_match(output$plot$alt, sprintf("^Scatter plot of %d motifs", sum(!is.na(t$z))))   # N dalla tabella
+    expect_match(output$plot$alt, "-log10 p baseline (x) against -log10 p corrected (y)", fixed = TRUE)
+
+    session$setInputs(genes = paste(real_symbols(10), collapse = " "), go = 2)           # nessun motivo con z
+    expect_error(output$plot, "plot not available")
+
+    session$setInputs(genes = "FOO BAR", go = 3)                                         # analyze_list fallisce
+    err <- tryCatch(output$plot, error = function(e) e)
+    expect_s3_class(err, "shiny.silent.error")
+    expect_identical(conditionMessage(err), "")                            # silenzioso: nessun messaggio da mostrare
+
+    session$setInputs(genes = paste(motif_symbols(400), collapse = " "), go = 4)         # tutti i geni di un motivo: p = 0
+    t <- res()$table
+    expect_true(any(c(t$p_baseline, t$p_corrected) < .Machine$double.xmin, na.rm = TRUE))   # c'e' un p = 0
+    expect_true(is_png(output$plot))
+  })
+})
+
+test_that("(9) scheda Analysis: card Results, Comparison, Motifs; plotOutput('plot') dentro Comparison", {
+  skip_if_not(data_ok)
+  shiny::testServer(app_dir, {
+    html <- htmltools::renderTags(app_get("ui", session))$html
+    m <- gregexpr('<div class="card-header[^>]*>[^<]*', html)[[1]]
+    expect_identical(trimws(sub("<[^>]*>", "", regmatches(html, list(m))[[1]])),
+                     c("Results", "Comparison", "Motifs"))
+    plot_pos <- regexpr('id="plot"', html, fixed = TRUE)[1]
+    expect_true(plot_pos > m[2] && plot_pos < m[3])
+  })
+})
+
+test_that("(10) riga sotto il grafico: 'N motifs drawn out of M (...)', N e M dalla tabella", {
+  skip_if_not(data_ok)
+  shiny::testServer(app_dir, {
+    line_for <- function(t) sprintf("%d motifs drawn out of %d (the others have no corrected test)",
+                                    sum(!is.na(t$z)), nrow(t))
+    session$setInputs(genes = paste(real_symbols(60), collapse = " "), go = 1)
+    expect_identical(box_text(output$plot_note), line_for(res()$table))
+    session$setInputs(genes = paste(real_symbols(10), collapse = " "), go = 2)           # 0 motivi disegnati
+    expect_identical(box_text(output$plot_note), line_for(res()$table))
+    session$setInputs(genes = "FOO BAR", go = 3)                                         # errore: nessuna riga
+    expect_error(output$plot_note, class = "shiny.silent.error")
+
+    html <- htmltools::renderTags(app_get("ui", session))$html
+    m <- gregexpr('<div class="card-header[^>]*>[^<]*', html)[[1]]
+    plot_pos <- regexpr('id="plot"', html, fixed = TRUE)[1]
+    note_pos <- regexpr('id="plot_note"', html, fixed = TRUE)[1]
+    expect_true(plot_pos < note_pos && note_pos < m[3])                   # sotto il grafico, prima di Motifs
   })
 })
