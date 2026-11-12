@@ -9,7 +9,7 @@
 # minuscole. Restituisce list(idx = righe trovate, not_found = nomi non trovati).
 map_ids <- function(x, genes) {
   if (!all(c("entrez", "symbol", "ensembl") %in% names(genes)))
-    stop("`genes` deve avere le colonne entrez, symbol ed ensembl", call. = FALSE)
+    stop("`genes` must have the columns entrez, symbol and ensembl", call. = FALSE)
 
   x <- x[!is.na(x)]
   # Un Entrez numerico come 100000 diventerebbe "1e+05" con as.character():
@@ -39,13 +39,13 @@ map_ids <- function(x, genes) {
 # Un errore chiaro qui e' meglio di un risultato strano piu' avanti.
 check_list <- function(idx, n_genes) {
   if (length(idx) == 0)
-    stop("la lista e' vuota: nessun gene riconosciuto", call. = FALSE)
+    stop("the list is empty: no gene recognised", call. = FALSE)
   if (anyNA(idx) || any(idx < 1 | idx > n_genes | idx != round(idx)))
-    stop("gli indici dei geni devono essere interi tra 1 e ", n_genes, call. = FALSE)
+    stop("gene indices must be integers between 1 and ", n_genes, call. = FALSE)
   if (anyDuplicated(idx))
-    stop("la lista contiene indici ripetuti", call. = FALSE)
+    stop("the list contains repeated indices", call. = FALSE)
   if (length(idx) >= n_genes)
-    stop("la lista contiene tutti i geni: il test non ha senso", call. = FALSE)
+    stop("the list contains all genes: the test is meaningless", call. = FALSE)
   invisible(idx)
 }
 
@@ -56,7 +56,7 @@ check_list <- function(idx, n_genes) {
 # Il BH si calcola poi solo sui motivi tenuti (quelli che passi alle funzioni).
 select_motifs <- function(hits, n_genes, frac_range = c(0.005, 0.9)) {
   if (!is.numeric(frac_range) || length(frac_range) != 2 || frac_range[1] > frac_range[2])
-    stop("`frac_range` deve essere c(minimo, massimo) con minimo <= massimo", call. = FALSE)
+    stop("`frac_range` must be c(minimum, maximum) with minimum <= maximum", call. = FALSE)
   # lengths() da' la lunghezza di ogni elemento: qui, quanti geni hanno il sito
   frac <- lengths(lapply(hits, `[[`, "genes")) / n_genes
   frac >= frac_range[1] & frac <= frac_range[2]
@@ -111,7 +111,7 @@ score_fit <- function(idx, hits, genes) {
   Z <- cbind(1, as.numeric(scale(genes$gc)),
              as.numeric(scale(log1p(genes$total_sites_noext))))
   if (anyNA(Z))
-    stop("gc e total_sites_noext devono essere numeri non costanti e senza NA", call. = FALSE)
+    stop("gc and total_sites_noext must be non-constant numbers without NA", call. = FALSE)
 
   # modello nullo: solo intercetta, gc e densita' (senza has_site)
   warned <- FALSE
@@ -160,15 +160,15 @@ score_fit <- function(idx, hits, genes) {
 enrich_corrected <- function(idx, hits, genes, min_expected = 10) {
   if (!is.numeric(min_expected) || length(min_expected) != 1 ||
       !is.finite(min_expected) || min_expected < 0)
-    stop("`min_expected` deve essere un numero singolo finito >= 0", call. = FALSE)
+    stop("`min_expected` must be a single finite number >= 0", call. = FALSE)
   N <- nrow(genes)
   check_list(idx, N)
   K <- lengths(lapply(hits, `[[`, "genes"))
   E <- length(idx) * K / N               # geni attesi con il sito (n * K / N, come in enrich_baseline)
   sf <- score_fit(idx, hits, genes)
   if (is.null(sf)) {
-    warning("il modello senza motivo non e' stimabile (lista troppo piccola o ",
-            "separabile dalle covariate): risultati NA", call. = FALSE)
+    warning("the null model cannot be fitted (list too small or ",
+            "separable by the covariates): results NA", call. = FALSE)
     z <- rep(NA_real_, length(hits))
   } else {
     z <- sf$z

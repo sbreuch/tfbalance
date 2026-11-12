@@ -100,7 +100,7 @@ test_that("map_ids: Entrez numerico grande non diventa notazione scientifica", {
 
 test_that("map_ids: se mancano colonne in genes e' un errore", {
   toy <- make_toy()
-  expect_error(map_ids("G5", toy$genes[, c("symbol", "gc")]), "deve avere le colonne")
+  expect_error(map_ids("G5", toy$genes[, c("symbol", "gc")]), "must have the columns")
 })
 
 # === select_motifs ==========================================================
@@ -119,8 +119,8 @@ test_that("select_motifs: frac_range = c(0, 1) tiene tutti i motivi", {
 
 test_that("select_motifs: frac_range non valido e' un errore", {
   hits <- mk_hits(c(10, 20))
-  expect_error(select_motifs(hits, 1000, 0.5), "frac_range")
-  expect_error(select_motifs(hits, 1000, c(0.9, 0.1)), "frac_range")
+  expect_error(select_motifs(hits, 1000, 0.5), "must be c\\(minimum, maximum\\)")
+  expect_error(select_motifs(hits, 1000, c(0.9, 0.1)), "must be c\\(minimum, maximum\\)")
 })
 
 # === enrich_baseline ========================================================
@@ -178,11 +178,11 @@ test_that("enrich_baseline: nessun gene della lista col sito -> p = 1", {
 test_that("enrich_baseline: liste non valide sono errori con messaggio chiaro", {
   toy <- make_toy()
   N <- nrow(toy$genes)
-  expect_error(enrich_baseline(integer(0), toy$hits, N), "vuota")
-  expect_error(enrich_baseline(seq_len(N), toy$hits, N), "tutti i geni")
-  expect_error(enrich_baseline(c(1, N + 1), toy$hits, N), "tra 1 e")
-  expect_error(enrich_baseline(c(1, NA), toy$hits, N), "tra 1 e")
-  expect_error(enrich_baseline(c(1, 1, 2), toy$hits, N), "ripetuti")
+  expect_error(enrich_baseline(integer(0), toy$hits, N), "is empty")
+  expect_error(enrich_baseline(seq_len(N), toy$hits, N), "all genes")
+  expect_error(enrich_baseline(c(1, N + 1), toy$hits, N), "between 1 and")
+  expect_error(enrich_baseline(c(1, NA), toy$hits, N), "between 1 and")
+  expect_error(enrich_baseline(c(1, 1, 2), toy$hits, N), "repeated")
 })
 
 # === enrich_corrected =======================================================
@@ -308,17 +308,17 @@ test_that("enrich_corrected: motivo = esattamente la lista (K = n) -> z finito e
 
 test_that("enrich_corrected: liste e covariate non valide sono errori chiari", {
   toy <- make_toy(N = 300)
-  expect_error(enrich_corrected(integer(0), toy$hits, toy$genes), "vuota")
-  expect_error(enrich_corrected(c(1, 1, 2), toy$hits, toy$genes), "ripetuti")
+  expect_error(enrich_corrected(integer(0), toy$hits, toy$genes), "is empty")
+  expect_error(enrich_corrected(c(1, 1, 2), toy$hits, toy$genes), "repeated")
   g2 <- toy$genes; g2$gc <- 0.5                  # gc costante: non si puo' standardizzare
-  expect_error(enrich_corrected(1:60, toy$hits, g2), "non costanti")
+  expect_error(enrich_corrected(1:60, toy$hits, g2), "non-constant")
 })
 
 test_that("enrich_corrected: modello nullo non stimabile -> tutti NA e un avviso", {
   toy <- make_toy(N = 300)
   toy$genes$gc <- sort(toy$genes$gc)             # gc cresce col numero di riga
   idx <- 296:300                                 # i 5 geni a gc piu' alto: gc li separa da soli
-  expect_warning(res <- enrich_corrected(idx, toy$hits, toy$genes, min_expected = 0), "non e' stimabile")
+  expect_warning(res <- enrich_corrected(idx, toy$hits, toy$genes, min_expected = 0), "null model")
   expect_true(all(is.na(res$z)))
 })
 
@@ -396,10 +396,10 @@ test_that("enrich_corrected: min_expected = 0 riproduce il comportamento precede
 
 test_that("enrich_corrected: min_expected non valido e' un errore con messaggio chiaro", {
   toy <- make_toy(N = 300)
-  # messaggio atteso: "`min_expected` deve essere un numero singolo finito >= 0"
+  # messaggio atteso: "`min_expected` must be a single finite number >= 0"
   for (bad in list(-1, "10", NA_real_, c(5, 10), TRUE, NULL, Inf))
     expect_error(enrich_corrected(1:60, toy$hits, toy$genes, min_expected = bad),
-                 "min_expected.*numero singolo finito", info = paste(deparse(bad), collapse = ""))
+                 "min_expected.*single finite number", info = paste(deparse(bad), collapse = ""))
 })
 
 test_that("la soglia SCORE_VAR_MIN sta nel divario tra rumore e informazione vera", {
@@ -671,8 +671,8 @@ test_that("odds_ratio_one: il segno di log(or) coincide con quello di z di enric
 
 test_that("odds_ratio_one: lista non valida e' un errore chiaro", {
   toy <- make_toy(N = 300)
-  expect_error(odds_ratio_one(integer(0), 1:10, toy$genes), "vuota")
-  expect_error(odds_ratio_one(c(1, 1, 2), 1:10, toy$genes), "ripetuti")
+  expect_error(odds_ratio_one(integer(0), 1:10, toy$genes), "is empty")
+  expect_error(odds_ratio_one(c(1, 1, 2), 1:10, toy$genes), "repeated")
 })
 
 # --- odds_ratio_one: celle vuote della tabella 2x2 has_site x in_list ------------

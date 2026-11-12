@@ -155,7 +155,7 @@ test_that("un token corrisponde sempre a un solo gene: simbolo, poi Ensembl, poi
 
 test_that("gli errori di check_list si propagano con il loro messaggio", {
   toy <- make_toy()
-  expect_error(analyze_list(sym_text(1:200), toy$genes, toy$hits), "tutti i geni")
+  expect_error(analyze_list(sym_text(1:200), toy$genes, toy$hits), "all genes")
 })
 
 test_that("MAX_LIST e' 5000", {
@@ -294,9 +294,9 @@ test_that("il filtro esclude tutti i motivi: errore italiano che nasce in analyz
 test_that("frac_range e min_expected non validi: l'errore di enrich.R arriva all'utente", {
   toy <- make_toy()
   expect_error(analyze_list(sym_text(1:60), toy$genes, toy$hits, frac_range = c(0.9, 0.1)),
-               "frac_range")
+               "must be c\\(minimum, maximum\\)")
   expect_error(analyze_list(sym_text(1:60), toy$genes, toy$hits, min_expected = -1),
-               "min_expected")
+               "min_expected.*single finite number")
 })
 
 # === test corretto: n_corrected e corrected_note ============================
@@ -341,7 +341,7 @@ test_that("modello non stimabile (enrich_corrected sostituita: tutti NA): la not
   # finta enrich_corrected: stesso avviso e stesse colonne dell'originale, z/p/fdr tutti NA,
   # ma `expected` vero: con n = 60 tre motivi hanno E >= 10
   assign("enrich_corrected", function(idx, hits, genes, min_expected = 10) {
-    warning("il modello senza motivo non e' stimabile (finto)", call. = FALSE)
+    warning("the null model cannot be fitted (mock)", call. = FALSE)
     K <- lengths(lapply(hits, `[[`, "genes"))
     data.frame(id = vapply(hits, function(h) h$id, ""),
                tf = vapply(hits, function(h) h$tf, ""),
@@ -351,7 +351,7 @@ test_that("modello non stimabile (enrich_corrected sostituita: tutti NA): la not
   on.exit(assign("enrich_corrected", orig, envir = env), add = TRUE)
 
   # l'avviso di enrich_corrected arriva al chiamante: analyze_list non lo intercetta
-  expect_warning(r <- analyze_list(sym_text(1:60), toy$genes, toy$hits), "non e' stimabile")
+  expect_warning(r <- analyze_list(sym_text(1:60), toy$genes, toy$hits), "null model")
   expect_equal(r$n_corrected, 0)
   expect_true(any(r$table$expected >= 10))     # quindi NON e' un problema di E bassa
   expect_match(r$corrected_note, "cannot be fitted")
@@ -363,7 +363,7 @@ test_that("modello non stimabile con input reale (lista = i geni con GC piu' alt
   toy <- make_toy()
   top <- order(toy$genes$gc, decreasing = TRUE)[1:60]
   txt <- paste(toy$genes$symbol[top], collapse = " ")
-  expect_warning(r <- analyze_list(txt, toy$genes, toy$hits), "non e' stimabile")
+  expect_warning(r <- analyze_list(txt, toy$genes, toy$hits), "null model")
   expect_equal(r$n_corrected, 0)
   expect_match(r$corrected_note, "cannot be fitted")
   expect_false(anyNA(r$table$p_baseline))      # il baseline c'e' comunque
