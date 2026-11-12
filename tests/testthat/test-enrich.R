@@ -734,3 +734,50 @@ test_that("odds_ratio_one: con una cella vuota glm non viene chiamato (controllo
     expect_equal(calls, 0)
   }, finally = rm("glm", envir = globalenv()))
 })
+
+# === bh_subset ==============================================================
+# bh_subset(p, keep) -> numeric: p aggiustati con Benjamini-Hochberg calcolati SOLO sui motivi
+# con keep = TRUE (e p non NA); NA per tutti gli altri. Serve per confrontare il baseline e il
+# corretto sulla stessa famiglia di motivi: l'FDR dipende dal numero di test m.
+
+# 10 motivi; il "sottoinsieme" e' fatto dai motivi 1, 2, 3 e 10 (m = 4).
+bh_p <- c(.004, .012, .02, .2, .3, .4, .5, .6, .8, .9)
+bh_keep <- seq_along(bh_p) %in% c(1, 2, 3, 10)
+
+test_that("bh_subset: valori calcolati a mano (m = 4, non 10)", {
+  # BH con m = 4 sui p .004 .012 .02 .9: p * m / rango = .016 .024 .02667 .9, gia' non decrescenti
+  r <- bh_subset(bh_p, bh_keep)
+  expect_equal(r[bh_keep], c(.016, .024, .02 * 4 / 3, .9))
+  expect_true(all(is.na(r[!bh_keep])))
+  # con tutti i 10 motivi gli stessi p darebbero .04 .06 .0667 ... : e' la famiglia che cambia
+  expect_equal(p.adjust(bh_p, "BH")[1:3], c(.04, .06, .02 * 10 / 3))
+  expect_false(isTRUE(all.equal(r[1], p.adjust(bh_p, "BH")[1])))
+})
+
+test_that("bh_subset: con keep tutto TRUE coincide con p.adjust(p, 'BH')", {
+  set.seed(7); p <- runif(50)
+  expect_equal(bh_subset(p, rep(TRUE, 50)), p.adjust(p, "BH"))
+})
+
+test_that("bh_subset: coincide con p.adjust sui soli motivi tenuti, qualunque sia l'ordine", {
+  set.seed(8); p <- runif(40); keep <- runif(40) < .5
+  expect_equal(bh_subset(p, keep)[keep], p.adjust(p[keep], "BH"))
+  ord <- sample(40)
+  expect_equal(bh_subset(p[ord], keep[ord]), bh_subset(p, keep)[ord])
+})
+
+test_that("bh_subset: un p NA tra i motivi tenuti resta NA e non conta in m", {
+  p <- c(.01, NA, .04, .03)
+  expect_equal(bh_subset(p, rep(TRUE, 4)), c(.03, NA, .04, .04))   # come BH su 3 p (.01 .03 .04)
+})
+
+test_that("bh_subset: nessun motivo tenuto -> tutto NA, senza errori", {
+  expect_equal(bh_subset(c(.1, .2), c(FALSE, FALSE)), c(NA_real_, NA_real_))
+  expect_equal(bh_subset(numeric(0), logical(0)), numeric(0))
+})
+
+test_that("bh_subset: argomenti non validi sono un errore", {
+  expect_error(bh_subset(c(.1, .2), TRUE), "stessa lunghezza")
+  expect_error(bh_subset(c(.1, .2), c(1, 0)), "logico")
+  expect_error(bh_subset(c(.1, .2), c(TRUE, NA)), "NA")
+})

@@ -184,6 +184,26 @@ enrich_corrected <- function(idx, hits, genes, min_expected = 10) {
 }
 
 # ---------------------------------------------------------------------------
+# bh_subset: p aggiustati con Benjamini-Hochberg (BH) calcolati SOLO sui motivi con
+# keep = TRUE; per gli altri il risultato e' NA.
+# Perche': l'FDR di BH dipende da m, il numero di test (la soglia e' p_(i) <= (i/m) * q).
+# enrich_corrected da' NA ai motivi con pochi geni attesi, quindi il suo BH e' calcolato su
+# meno motivi di quello di enrich_baseline. Per confrontare i due test "a parita' di famiglia"
+# si ricalcola il BH del baseline sugli stessi motivi: bh_subset(p_baseline, !is.na(z)).
+# p.adjust() esclude gia' gli NA dal conteggio di m; qui si esclude anche chi ha keep = FALSE.
+bh_subset <- function(p, keep) {
+  if (length(p) != length(keep))
+    stop("`p` e `keep` devono avere la stessa lunghezza", call. = FALSE)
+  if (!is.logical(keep))
+    stop("`keep` deve essere un vettore logico", call. = FALSE)
+  if (anyNA(keep))
+    stop("`keep` non deve contenere NA", call. = FALSE)
+  out <- rep(NA_real_, length(p))
+  out[keep] <- p.adjust(p[keep], "BH")
+  out
+}
+
+# ---------------------------------------------------------------------------
 # random_list: lista dimostrativa di n geni (indici di riga di `genes`, ordinati).
 #
 # biased = FALSE: n geni a caso con la stessa probabilita'.
