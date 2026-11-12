@@ -211,14 +211,20 @@ test_that("compare_plot: se la soglia cade su p = 0 la linea sta al tetto (finit
   expect_equal(layer_data(p, 4)$xintercept, cap)
 })
 
-test_that("compare_plot: etichette italiane, assi con gli stessi limiti (0, tetto), rapporto 1:1", {
+test_that("compare_plot: etichette inglesi, assi con gli stessi limiti (0, tetto), rapporto 1:1", {
   p <- compare_plot(fx)
   expect_equal(get_labs(p)$x, "-log10 p baseline")
-  expect_equal(get_labs(p)$y, "-log10 p corretto")
+  expect_equal(get_labs(p)$y, "-log10 p corrected")
   cap <- compare_data(fx)$cap
   expect_equal(p$scales$get_scales("x")$limits, c(0, cap))
   expect_equal(p$scales$get_scales("y")$limits, c(0, cap))
   expect_equal(p$coordinates$ratio, 1)
+})
+
+test_that("compare_plot: la legenda dei punti ha le etichette inglesi", {
+  p <- compare_plot(mk(c(0, .01, .02), c(.5, .001, 0)))      # ci sono punti troncati
+  expect_equal(unname(p$scales$get_scales("shape")$labels),
+               c("p computed", "p = 0 (underflow): drawn at the plot limit"))
 })
 
 test_that("compare_plot: forma diversa solo per i punti troncati; nessun Inf in nessuno strato", {

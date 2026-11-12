@@ -83,12 +83,12 @@ compare_plot <- function(table) {
 
   g <- g +
     scale_shape_manual(name = NULL, values = c(`FALSE` = 16, `TRUE` = 17),
-                       labels = c(`FALSE` = "p calcolato",
-                                  `TRUE` = "p = 0 (underflow): disegnato al limite del grafico")) +
+                       labels = c(`FALSE` = "p computed",
+                                  `TRUE` = "p = 0 (underflow): drawn at the plot limit")) +
     scale_x_continuous(limits = c(0, d$cap), expand = expansion(mult = 0.02)) +
     scale_y_continuous(limits = c(0, d$cap), expand = expansion(mult = 0.02)) +
     coord_fixed(1) +
-    labs(x = "-log10 p baseline", y = "-log10 p corretto") +
+    labs(x = "-log10 p baseline", y = "-log10 p corrected") +
     theme_minimal(base_size = 13) +
     theme(legend.position = "bottom")
   if (!any(pts$clip)) g <- g + guides(shape = "none")    # niente legenda se non c'e' nulla da spiegare
