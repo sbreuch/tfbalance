@@ -27,24 +27,37 @@ Benjamini-Hochberg.
 
 ## The app
 
-Paste a list of human genes and press **Analizza** (the interface is in Italian).
+Paste a list of human genes and press **Analyse** (the interface and the messages are in
+British English).
 Genes can be symbols, Entrez IDs or Ensembl IDs (also `ENSG....7`), separated by
 spaces, tabs, commas, semicolons or new lines. Both tests are computed on the 852
 motifs of the default filter and shown side by side, one row per motif.
 
 **Current state**
 
-- Tab *Analisi*: text box and button; a summary box (recognised genes, repeated or
-  ignored tokens, unrecognised names, motifs tested and excluded by the filter,
-  motifs with the corrected test, and a note when the corrected test is not
-  available); a table (DT) with `k`, `K`, expected genes, `z` and p and FDR of both
-  tests, sorted by the corrected p-value (`NA` last), with a caption on the `NA`
-  values. Errors, for example no gene recognised, are shown in red.
-- Tab *Geni non riconosciuti*: number and list of the names not recognised.
-- Tab *Come funziona*: placeholder, the text is still to be written.
-- Planned, not in the app yet: a comparison plot (its data and the FDR counts are
-  in `R/compare.R`, written and tested but not used by `app.R`) and demo buttons
-  (`random_list` exists in `R/enrich.R`).
+- Tab *Analysis*: text box and button, then three cards. Errors, for example no gene
+  recognised, are shown in red.
+  - *Results*: a summary box (recognised genes, repeated tokens or synonyms ignored,
+    unrecognised names, motifs tested and excluded by the filter, motifs with the
+    corrected test, and a note when the corrected test is not available). Under
+    "Motifs with FDR < 0.05" three counts: the baseline on all the tested motifs;
+    the baseline recomputed (`bh_subset`) on the same motifs as the corrected test,
+    to compare the two tests on the same family of motifs; and the corrected test.
+    The last two read "not available" when no motif has the corrected test.
+  - *Comparison*: a scatter plot with one point per motif that has the corrected test,
+    -log10 p baseline (x) against -log10 p corrected (y), with the dashed diagonal
+    y = x. A line marks FDR 0.05 for each test that has significant motifs (the
+    largest p with FDR < 0.05; for the baseline, the FDR recomputed on the plotted
+    motifs). A p of 0 (underflow) is drawn as a triangle at the plot limit. The
+    plot has an alt text, and under it a line "N motifs drawn out of M (the others
+    have no corrected test)". If no motif has the corrected test, the plot is
+    replaced by "plot not available".
+  - *Motifs*: a table (DT) with the columns `Motif`, `TF`, `k`, `K`, `Expected (E)`,
+    `p baseline`, `FDR baseline`, `z`, `p corrected`, `FDR corrected`, sorted by the
+    corrected p-value (`NA` last), with a caption on the `NA` values.
+- Tab *Unrecognised genes*: number and list of the names not recognised.
+- Tab *How it works*: placeholder, the text is still to be written.
+- Planned, not in the app yet: demo buttons (`random_list` exists in `R/enrich.R`).
 - The app always uses the default filter and `min_expected = 10`: there is no
   control for them.
 
@@ -52,12 +65,11 @@ motifs of the default filter and shown side by side, one row per motif.
 
     Rscript -e 'shiny::runApp()'
 
-Shiny loads the files in `R/` by itself. It needs `shiny`, `bslib` and `DT`, plus
-`ggplot2` for `R/compare.R`.
+Shiny loads the files in `R/` by itself. It needs `shiny`, `bslib`, `DT` and `ggplot2`.
 
 **Code:** `app.R` (interface and server); `R/analyze.R` (`analyze_list`: parsing,
-limits, motif filter, both tests, sorting); `R/compare.R` (plot data, thresholds and
-FDR counts); `R/enrich.R` (all the statistics).
+limits, motif filter, both tests, sorting); `R/compare.R` (plot data, FDR thresholds,
+FDR counts and the plot); `R/enrich.R` (all the statistics).
 
 ## Data preparation
 
@@ -169,8 +181,8 @@ the list expected to have a site.
   `min_expected = 0` turns the rule off. Other `NA` cases: `K = 0` or `K = N`
   (nothing to compare), a relative variance guard (`v / sum(w) < 1e-8`), and a
   null model that cannot be fitted (a warning and all `NA`).
-- **`odds_ratio_one` notes** (the strings are in Italian): `"ok"`;
-  `"has_site costante"` (`K = 0` or `K = N`); `"separazione o non convergenza"`.
+- **`odds_ratio_one` notes**: `"ok"`;
+  `"constant has_site"` (`K = 0` or `K = N`); `"separation or non-convergence"`.
   The last one is returned, with `NA` numbers and without calling `glm`, when
   any cell of the 2x2 table `has_site` x `in_list` is zero (`k`, `n - k`,
   `K - k`, `N - K - (n - k)`): the maximum-likelihood estimate does not exist.
@@ -258,10 +270,9 @@ of 300 genes unless stated.
 
 ## Requirements
 
-- App: R with `shiny`, `bslib`, `DT`, `ggplot2` (`ggplot2` is used by
-  `R/compare.R`, not yet by `app.R`)
-- Tests: `testthat` (the app tests also use `jsonlite` and `htmltools`, installed
-  with `shiny`)
+- App: R with `shiny`, `bslib`, `DT`, `ggplot2`
+- Tests: `testthat` (the app tests also use `jsonlite`, `htmltools` and `withr`;
+  the first two are installed with `shiny`, `withr` with `testthat`)
 - Data preparation only: Bioconductor packages `GenomicFeatures`, `Biostrings`,
   `BSgenome`, `AnnotationDbi`, `org.Hs.eg.db`, `TxDb.Hsapiens.UCSC.hg38.knownGene`,
   `BSgenome.Hsapiens.UCSC.hg38`
@@ -289,6 +300,22 @@ of 300 genes unless stated.
 - The app accepts at most 5000 recognised genes (`MAX_LIST` in `R/analyze.R`, the
   largest size timed in step 7) and 50,000 raw tokens (`MAX_TOKENS`); beyond that it
   shows an error.
+- The comparison plot uses one range for both axes, up to the largest value
+  (`R/compare.R`): with one very extreme motif the other motifs are compressed into
+  a corner. The tests check the data and the layers of the plot, not the rendered
+  image.
+- The tests of the app (`tests/testthat/test-app.R`) rely on internals: the JSON that
+  DT builds for the table (`columnDefs`, `DTWidget.formatSignif` and `formatRound`),
+  the environment of `app.R` reached with `parent.env(session$env)`, a stand-in for
+  `withProgress` that records the progress message (in `shiny::testServer` the
+  progress does nothing), and the empty message of the silent error raised by
+  `req()`. An update of DT or Shiny can break them without the app being wrong.
+- `real_symbols()`, a helper of `test-app.R`, calls `set.seed()`: its result is
+  deterministic, but it changes the random-number state of the R session that runs
+  the tests.
+- The note `"separation or non-convergence"` of `odds_ratio_one` is covered by the
+  tests only for the empty-cell case. The cases "`glm` does not converge or the
+  fitted probabilities are 0 or 1" and "beta or se not finite" have no test.
 
 ## Use of AI
 

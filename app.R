@@ -65,7 +65,7 @@ server <- function(input, output, session) {
     req(!is.null(input$genes))            # se il testo non esiste ancora, aspetta
     withProgress(message = "Analysing...", {   # messaggio mentre calcola
       tryCatch(
-        # suppressWarnings: l'avviso "modello non stimabile" non serve, c'e' gia'
+        # suppressWarnings: l'avviso "the null model cannot be fitted" non serve, c'e' gia'
         # la nota corrected_note nel risultato.
         suppressWarnings(analyze_list(input$genes, genes, hits)),
         # Se analyze_list da' un errore (messaggio italiano) lo salviamo invece di
@@ -172,7 +172,7 @@ server <- function(input, output, session) {
       formatRound(c("expected", "z"), 2)
   })
 
-  # Scheda "Geni non riconosciuti": il numero e l'elenco, un nome per riga.
+  # Scheda "Unrecognised genes": il numero e l'elenco, un nome per riga.
   # tags$pre mostra il testo cosi' com'e' (anche un nome con "<" non viene letto come HTML).
   output$notfound <- renderUI({
     r <- res()
