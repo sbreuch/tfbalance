@@ -77,13 +77,13 @@ server <- function(input, output, session) {
 
     tagList(
       tags$ul(
-        tags$li(paste0("Geni riconosciuti: ", r$n_list)),
-        tags$li(paste0("Token ripetuti o sinonimi ignorati: ", r$n_duplicates)),
-        tags$li(paste0("Non riconosciuti: ", length(r$not_found))),
-        tags$li(paste0("Motivi testati: ", r$n_motifs, " (esclusi: ", r$n_excluded_low,
-                       " sotto il minimo, ", r$n_excluded_high, " sopra il massimo)")),
-        tags$li(paste0("Test corretto disponibile per ", r$n_corrected, " di ",
-                       r$n_motifs, " motivi"))
+        tags$li(paste0("Recognised genes: ", r$n_list)),
+        tags$li(paste0("Repeated tokens or synonyms ignored: ", r$n_duplicates)),
+        tags$li(paste0("Unrecognised: ", length(r$not_found))),
+        tags$li(paste0("Motifs tested: ", r$n_motifs, " (excluded: ", r$n_excluded_low,
+                       " below the minimum, ", r$n_excluded_high, " above the maximum)")),
+        tags$li(paste0("Corrected test available for ", r$n_corrected, " of ",
+                       r$n_motifs, " motifs"))
       ),
       if (!is.null(r$corrected_note))     # la nota c'e' solo se nessun motivo ha il test corretto
         div(class = "alert alert-warning", r$corrected_note)
@@ -103,10 +103,10 @@ server <- function(input, output, session) {
     soglia <- formals(analyze_list)$min_expected
     na_con_atteso_alto <- any(is.na(r$table$z) & r$table$expected >= soglia)
     testo <- if (is.null(r$corrected_note) && !na_con_atteso_alto)
-      paste0("NA nel test corretto = atteso < ", format(soglia), " geni: test non affidabile.")
+      paste0("NA in the corrected test = expected < ", format(soglia), " genes: test not reliable.")
     else
-      paste0("NA nel test corretto = test non calcolato (la causa e' nella nota sopra; ",
-             "senza nota, il motivo non e' analizzabile, per esempio e' presente in tutti i geni).")
+      paste0("NA in the corrected test = test not computed (the cause is in the note above; ",
+             "with no note, the motif cannot be analysed, for example because it is present in all genes).")
     p(class = "text-muted small", testo)
   })
 
@@ -121,8 +121,8 @@ server <- function(input, output, session) {
     datatable(
       r$table,
       rownames = FALSE,                   # niente colonna con i numeri di riga
-      colnames = c("Motivo", "TF", "k", "K", "Attesi (E)", "p baseline", "FDR baseline",
-                   "z", "p corretto", "FDR corretto"),
+      colnames = c("Motif", "TF", "k", "K", "Expected (E)", "p baseline", "FDR baseline",
+                   "z", "p corrected", "FDR corrected"),
       options = list(order = list(), pageLength = 25)
     ) |>
       formatSignif(c("p_baseline", "fdr_baseline", "p_corrected", "fdr_corrected"), 3) |>

@@ -58,8 +58,8 @@ top_gc_symbols <- function(n) {
 tbl_json <- function(x) jsonlite::fromJSON(unclass(x), simplifyVector = FALSE)
 
 # intestazioni italiane della tabella, nell'ordine delle colonne di res()$table
-TABLE_HEADERS <- c("Motivo", "TF", "k", "K", "Attesi (E)", "p baseline", "FDR baseline",
-                   "z", "p corretto", "FDR corretto")
+TABLE_HEADERS <- c("Motif", "TF", "k", "K", "Expected (E)", "p baseline", "FDR baseline",
+                   "z", "p corrected", "FDR corrected")
 
 COLS <- c("id", "tf", "k", "K", "expected", "p_baseline", "fdr_baseline",
           "z", "p_corrected", "fdr_corrected")
@@ -110,14 +110,14 @@ test_that("(b) testo del riquadro: conteggi e 'test corretto disponibile per X d
     session$setInputs(genes = txt, go = 1)
     r <- res()
     s <- box_text(output$summary)
-    expect_match(s, "Geni riconosciuti: 60", fixed = TRUE)
-    expect_match(s, "Token ripetuti o sinonimi ignorati: 1", fixed = TRUE)
-    expect_match(s, "Non riconosciuti: 1", fixed = TRUE)
-    expect_match(s, sprintf("Motivi testati: %d (esclusi: %d sotto il minimo, %d sopra il massimo)",
+    expect_match(s, "Recognised genes: 60", fixed = TRUE)
+    expect_match(s, "Repeated tokens or synonyms ignored: 1", fixed = TRUE)
+    expect_match(s, "Unrecognised: 1", fixed = TRUE)
+    expect_match(s, sprintf("Motifs tested: %d (excluded: %d below the minimum, %d above the maximum)",
                             r$n_motifs, r$n_excluded_low, r$n_excluded_high), fixed = TRUE)
     # X e Y sono n_corrected e n_motifs di analyze_list, non numeri scritti a mano
-    expect_match(tolower(s), sprintf("test corretto disponibile per %d di %d motivi",
-                                     r$n_corrected, r$n_motifs), fixed = TRUE)
+    expect_match(s, sprintf("Corrected test available for %d of %d motifs",
+                            r$n_corrected, r$n_motifs), fixed = TRUE)
     expect_gt(r$n_corrected, 0)                    # con 60 geni qualche motivo ha E >= 10
     expect_null(r$corrected_note)
     expect_false(grepl("alert-danger", as.character(output$summary$html)))
@@ -131,7 +131,7 @@ test_that("(b) lista piccola: 'disponibile per 0 di Y motivi' e compare correcte
     r <- res()
     expect_equal(r$n_corrected, 0)                 # 10 geni: E <= 9 per ogni motivo
     s <- box_text(output$summary)
-    expect_match(tolower(s), sprintf("test corretto disponibile per 0 di %d motivi", r$n_motifs),
+    expect_match(s, sprintf("Corrected test available for 0 of %d motifs", r$n_motifs),
                  fixed = TRUE)
     expect_type(r$corrected_note, "character")
     expect_match(s, r$corrected_note, fixed = TRUE)   # la nota e' mostrata nel riquadro
@@ -149,7 +149,7 @@ test_that("(c) nessun gene riconosciuto: res()$error e riquadro rosso con il mes
     expect_match(as.character(output$summary$html), "alert-danger", fixed = TRUE)
     s <- box_text(output$summary)
     expect_match(s, "No gene recognised", fixed = TRUE)
-    expect_false(grepl("Geni riconosciuti", s))    # niente conteggi accanto all'errore
+    expect_false(grepl("Recognised genes", s))    # niente conteggi accanto all'errore
   })
 })
 
@@ -219,7 +219,7 @@ test_that("(e) lista separabile: nessun avviso arriva al test e la nota 'non e' 
     expect_equal(r$n_corrected, 0)
     expect_match(r$corrected_note, "cannot be fitted", fixed = TRUE)
     expect_match(s, "cannot be fitted", fixed = TRUE)
-    expect_match(s, "Test corretto disponibile per 0 di", fixed = TRUE)
+    expect_match(s, "Corrected test available for 0 of", fixed = TRUE)
     expect_false(grepl("no motif has E", s))        # non e' un problema di E bassa
   })
 })
@@ -284,9 +284,9 @@ test_that("(g) didascalia: NA nel test corretto = atteso < N geni, con N letto d
     expect_true(is.numeric(n))
     session$setInputs(genes = paste(real_symbols(60), collapse = " "), go = 1)
     s <- box_text(output$caption)
-    expect_match(s, "NA nel test corretto", fixed = TRUE)
-    expect_match(s, sprintf("atteso < %s geni", format(n)), fixed = TRUE)
-    expect_match(s, "test non affidabile", fixed = TRUE)
+    expect_match(s, "NA in the corrected test", fixed = TRUE)
+    expect_match(s, sprintf("expected < %s genes", format(n)), fixed = TRUE)
+    expect_match(s, "test not reliable", fixed = TRUE)
     # e la frase e' vera: ogni NA della tabella ha E sotto la soglia
     r <- res()
     expect_true(any(is.na(r$table$z)))
@@ -306,15 +306,19 @@ test_that("(g2) con corrected_note la didascalia non afferma 'atteso < N'", {
     session$setInputs(genes = paste(real_symbols(10), collapse = " "), go = 1)
     expect_type(res()$corrected_note, "character")
     s <- box_text(output$caption)
-    expect_match(s, "NA nel test corretto", fixed = TRUE)
-    expect_false(grepl("atteso <", s, fixed = TRUE))
+    expect_match(s, "NA in the corrected test", fixed = TRUE)
+    expect_false(grepl("expected <", s, fixed = TRUE))
+    expect_match(s, "test not computed", fixed = TRUE)                  # variante generica
+    expect_match(s, "the cause is in the note above", fixed = TRUE)
 
     session$setInputs(genes = paste(top_gc_symbols(60), collapse = " "), go = 2)
     expect_match(res()$corrected_note, "cannot be fitted", fixed = TRUE)
     expect_true(any(res()$table$expected >= formals(app_get("analyze_list", session))$min_expected))
     s <- box_text(output$caption)
-    expect_match(s, "NA nel test corretto", fixed = TRUE)
-    expect_false(grepl("atteso <", s, fixed = TRUE))     # qui NA anche con E alto: sarebbe falso
+    expect_match(s, "NA in the corrected test", fixed = TRUE)
+    expect_false(grepl("expected <", s, fixed = TRUE))     # qui NA anche con E alto: sarebbe falso
+    expect_match(s, "test not computed", fixed = TRUE)
+    expect_match(s, "the cause is in the note above", fixed = TRUE)
   })
 })
 
@@ -340,8 +344,11 @@ test_that("(g3) un NA con E >= soglia senza nota: la didascalia non dice '= atte
     expect_null(r$corrected_note)                         # nessuna nota...
     expect_true(any(is.na(r$table$z) & r$table$expected >= 10))   # ...ma un NA con E alto
     s <- box_text(output$caption)
-    expect_match(s, "NA nel test corretto", fixed = TRUE)
-    expect_false(grepl("= atteso <", s, fixed = TRUE))
+    expect_match(s, "NA in the corrected test", fixed = TRUE)
+    expect_false(grepl("= expected <", s, fixed = TRUE))
+    expect_match(s, "test not computed", fixed = TRUE)
+    expect_match(s, "the cause is in the note above", fixed = TRUE)
+    expect_match(s, "with no note, the motif cannot be analysed", fixed = TRUE)   # seconda meta' della frase
   })
 })
 
@@ -365,8 +372,8 @@ test_that("(g4) la soglia nella didascalia e' quella delle formals di analyze_li
     expect_null(r$corrected_note)                       # lista normale: la frase precisa
     expect_false(any(is.na(r$table$z) & r$table$expected >= 7))   # e' vera con soglia 7
     s <- box_text(output$caption)
-    expect_match(s, "atteso < 7 geni", fixed = TRUE)
-    expect_false(grepl("atteso < 10", s, fixed = TRUE))
+    expect_match(s, "expected < 7 genes", fixed = TRUE)
+    expect_false(grepl("expected < 10", s, fixed = TRUE))
   })
 })
 
