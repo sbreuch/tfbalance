@@ -414,13 +414,20 @@ test_that("(h) tab Geni non riconosciuti: se l'analisi da' errore, lo dice (non 
   })
 })
 
-test_that("(h) i tre tab ci sono, nell'ordine, e 'Come funziona' e' solo un segnaposto", {
+test_that("(h) i tre tab ci sono, nell'ordine; 'How it works' ha il testo e non il segnaposto", {
   skip_if_not(data_ok)
   shiny::testServer(app_dir, {
     html <- htmltools::renderTags(app_get("ui", session))$html
     tabs <- unique(gsub('data-value="|"', "", regmatches(html, gregexpr('data-value="[^"]+"', html))[[1]]))
     expect_identical(tabs, c("Analysis", "Unrecognised genes", "How it works"))
-    expect_match(html, "(text to be written)", fixed = TRUE)
+    expect_false(grepl("(text to be written)", html, fixed = TRUE))          # il segnaposto non c'e' piu'
+    # i quattro titoli (h4) ci sono, nell'ordine
+    titles <- c("What this app does", "Two tests, side by side", "Reading the results", "Limits")
+    pos <- vapply(sprintf("<h4>%s</h4>", titles), function(t) regexpr(t, html, fixed = TRUE)[1], numeric(1))
+    expect_true(all(pos > 0))
+    expect_false(is.unsorted(pos))
+    expect_match(html, "hypergeometric", fixed = TRUE)
+    expect_match(html, "FDR 0.05", fixed = TRUE)
   })
 })
 

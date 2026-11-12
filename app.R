@@ -51,7 +51,54 @@ ui <- page_navbar(
     )
   ),
   nav_panel("Unrecognised genes", uiOutput("notfound")),
-  nav_panel("How it works", p("(text to be written)"))     # segnaposto
+  nav_panel(
+    "How it works",                       # testo di spiegazione (inglese, ASCII): titoli h4, paragrafi p, elenchi ul/li
+    h4("What this app does"),
+    p(paste0(
+      'Paste a list of human genes (symbols, Entrez IDs or Ensembl IDs). For each transcription ',
+      'factor (TF) motif, the app asks whether the promoters of your genes contain predicted ',
+      'binding sites more often than expected by chance. A promoter is the region from 1000 bp ',
+      'upstream to 100 bp downstream of the transcription start site (GRCh38). Sites come from ',
+      'scanning 1019 JASPAR 2026 vertebrate motifs at 90% of the maximum score; 852 motifs are ',
+      'tested (those found in 0.5% to 90% of promoters).')),
+    h4("Two tests, side by side"),
+    tags$ul(
+      tags$li(paste0(
+        'Baseline: a one-sided hypergeometric test on "genes with at least one site". It does ',
+        'not account for the fact that promoters differ in GC content and in how many sites they ',
+        'contain overall, which can inflate some results.')),
+      tags$li(paste0(
+        'Corrected: a score test of the same question in a logistic model that also includes GC ',
+        'content and the number of predicted sites per promoter (log scale, leaving out the 109 ',
+        'motifs found in more than 90% of promoters).'))
+    ),
+    p(paste0('Both tests look only for enrichment, not depletion. P-values are adjusted with ',
+             'Benjamini-Hochberg (FDR).')),
+    h4("Reading the results"),
+    tags$ul(
+      tags$li(paste0(
+        'Table: k = genes of your list with a site; K = genes in the background with a site; ',
+        'Expected (E) = number of your genes expected to have a site by chance; p baseline and ',
+        'FDR baseline; z, p corrected and FDR corrected. NA in the corrected test means it was ',
+        'not computed (for example because E is below 10).')),
+      tags$li(paste0(
+        'Counts box: number of motifs with FDR < 0.05 for the baseline on all motifs, the ',
+        'baseline on the same motifs that have a corrected test (the fair comparison), and the ',
+        'corrected test.')),
+      tags$li(paste0(
+        'Plot: one point per motif that has a corrected test, baseline on the x axis and ',
+        'corrected on the y axis (-log10 p). Points below the dashed diagonal are less ',
+        'significant after correction. Red lines mark FDR 0.05 for each test that has ',
+        'significant motifs. Triangles show p = 0 (underflow), drawn at the plot limit.'))
+    ),
+    h4("Limits"),
+    p(paste0(
+      'Lists with fewer than 12 genes have no corrected test, and the maximum is 5000 genes. ',
+      'The corrected test also cannot be fitted for lists made only of extreme genes (for ',
+      'example the highest GC content). Motifs share genes, so the tests are not independent. ',
+      'The corrected test was checked mainly on random lists of 300 genes. Predicted sites are ',
+      'not proof of binding: use the results to generate hypotheses.'))
+  )
 )
 
 # --- 3. Server ----------------------------------------------------------------
