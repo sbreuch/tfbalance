@@ -3,11 +3,10 @@
 Shiny app for transcription-factor (TF) binding-site enrichment on human
 promoters, with a test that corrects for GC content and site density.
 
-**Status: work in progress.** The data preparation, the statistics (`R/enrich.R`),
-the analysis logic (`R/analyze.R`) and a first version of the app (`app.R`) are
-written and tested; the statistics are also checked on real data (see "Statistics"
-and "Validation and known limits"). The app runs locally and is not published. See
-"The app" for what it does today and what is planned.
+**Status: working version.** The analysis, both tests, the comparison plot and the
+FDR counts are implemented and tested. Planned: demo buttons. The statistics are also
+checked on real data (see "Statistics" and "Validation and known limits"). The app runs
+locally and is not published. See "The app" for the details.
 
 ## Idea
 
@@ -56,7 +55,8 @@ motifs of the default filter and shown side by side, one row per motif.
     `p baseline`, `FDR baseline`, `z`, `p corrected`, `FDR corrected`, sorted by the
     corrected p-value (`NA` last), with a caption on the `NA` values.
 - Tab *Unrecognised genes*: number and list of the names not recognised.
-- Tab *How it works*: placeholder, the text is still to be written.
+- Tab *How it works*: a short explanation of what the app does, the two tests, how to
+  read the table, the counts box and the plot, and the limits.
 - Planned, not in the app yet: demo buttons (`random_list` exists in `R/enrich.R`).
 - The app always uses the default filter and `min_expected = 10`: there is no
   control for them.
